@@ -55,10 +55,6 @@ export const MODEL_ALIASES: Record<string, string> = {
   "gemini-3-flash-low": "gemini-3-flash",
   "gemini-3-flash-medium": "gemini-3-flash",
   "gemini-3-flash-high": "gemini-3-flash",
-  "gemini-3.7-flash-minimal": "gemini-3.7-flash",
-  "gemini-3.7-flash-low": "gemini-3.7-flash",
-  "gemini-3.7-flash-medium": "gemini-3.7-flash",
-  "gemini-3.7-flash-high": "gemini-3.7-flash",
 
   // Claude proxy names (gemini- prefix for compatibility)
   "gemini-claude-opus-4-6-thinking-low": "claude-opus-4-6-thinking",
@@ -86,6 +82,16 @@ const GEMINI_36_FLASH_MODELS = {
   medium: "gemini-3.6-flash-medium",
   high: "gemini-3.6-flash-high",
 } as const;
+const GEMINI_37_FLASH_REGEX =
+  /^gemini-3\.7-flash(?:-(low|medium|high))?$/i;
+/**
+ * Unlike 3.6 Flash, Antigravity ships Gemini 3.7 Flash as a single "tiered" backend
+ * id. Verified against `v1internal:fetchAvailableModels`, which lists only
+ * `gemini-3.7-flash-tiered` (and references it from `tieredModelIds.flash`); the
+ * tier-suffixed ids all return 404 NOT_FOUND on `v1internal:generateContent`.
+ * The tier is selected through `thinkingConfig.thinkingLevel` instead.
+ */
+const GEMINI_37_FLASH_MODEL = "gemini-3.7-flash-tiered";
 const GEMINI_PUBLIC_ONLY_REGEX =
   /^(?:gemini-3\.5-flash-lite(?:-(?:minimal|low|medium|high))?|gemini-flash-lite-latest)$/i;
 /**
@@ -210,9 +216,31 @@ export function resolveAntigravityGemini36FlashBackendModel(
   return GEMINI_36_FLASH_MODELS[level];
 }
 
+/**
+ * Antigravity exposes Gemini 3.7 Flash as a single tiered backend id, so every
+ * tier resolves to the same model. The public Gemini API and Gemini CLI continue
+ * to use the bare stable id.
+ */
+export function resolveAntigravityGemini37FlashBackendModel(
+  model: string,
+  thinkingLevel?: string,
+): string | undefined {
+  const modelWithoutQuota = model.replace(QUOTA_PREFIX_REGEX, "");
+  const match = modelWithoutQuota.match(GEMINI_37_FLASH_REGEX);
+  if (!match) {
+    return undefined;
+  }
+
+  const level = (thinkingLevel ?? match[1] ?? "medium").toLowerCase();
+  if (level !== "low" && level !== "medium" && level !== "high") {
+    return undefined;
+  }
+  return GEMINI_37_FLASH_MODEL;
+}
+
 export function getDefaultGemini3ThinkingLevel(model: string): string {
   const normalized = model.toLowerCase().replace(QUOTA_PREFIX_REGEX, "");
-  if (/^gemini-3\.6-flash(?:-|$)/.test(normalized)) {
+  if (/^gemini-3\.[67]-flash(?:-|$)/.test(normalized)) {
     return "medium";
   }
   if (/^gemini-3\.5-flash-lite(?:-|$)/.test(normalized)) {
@@ -285,11 +313,15 @@ export function resolveModelWithTier(
 
   let antigravityModel = modelWithoutQuota;
   if (skipAlias) {
+    const gemini37FlashBackendModel =
+      resolveAntigravityGemini37FlashBackendModel(modelWithoutQuota, tier);
     const gemini36FlashBackendModel =
       resolveAntigravityGemini36FlashBackendModel(modelWithoutQuota, tier);
     const gemini35FlashBackendModel =
       resolveAntigravityGemini35FlashBackendModel(modelWithoutQuota, tier);
-    if (gemini36FlashBackendModel) {
+    if (gemini37FlashBackendModel) {
+      antigravityModel = gemini37FlashBackendModel;
+    } else if (gemini36FlashBackendModel) {
       antigravityModel = gemini36FlashBackendModel;
     } else if (gemini35FlashBackendModel) {
       antigravityModel = gemini35FlashBackendModel;

@@ -108,10 +108,10 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
   },
   "antigravity-gemini-3.7-flash": {
     name: "Gemini 3.7 Flash (Antigravity)",
+    temperature: false,
     limit: { context: 1048576, output: 65536 },
     modalities: DEFAULT_MODALITIES,
     variants: {
-      minimal: { thinkingLevel: "minimal" },
       low: { thinkingLevel: "low" },
       medium: { thinkingLevel: "medium" },
       high: { thinkingLevel: "high" },
@@ -175,10 +175,10 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
   },
   "gemini-3.7-flash": {
     name: "Gemini 3.7 Flash (Gemini CLI)",
+    temperature: false,
     limit: { context: 1048576, output: 65536 },
     modalities: DEFAULT_MODALITIES,
     variants: {
-      minimal: { thinkingLevel: "minimal" },
       low: { thinkingLevel: "low" },
       medium: { thinkingLevel: "medium" },
       high: { thinkingLevel: "high" },
@@ -243,6 +243,13 @@ function defaultVariantsForModel(modelId: string): Record<string, ModelVariant> 
       };
     }
     if (normalized.includes("flash")) {
+      if (normalized.includes("3.6") || normalized.includes("3.7")) {
+        return {
+          low: { thinkingLevel: "low" },
+          medium: { thinkingLevel: "medium" },
+          high: { thinkingLevel: "high" },
+        };
+      }
       return {
         minimal: { thinkingLevel: "minimal" },
         low: { thinkingLevel: "low" },
