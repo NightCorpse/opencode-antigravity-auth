@@ -245,6 +245,7 @@ describe("api-key agy sdk support", () => {
 
   it.each([
     ["antigravity-gemini-3.6-flash", "gemini-3.6-flash", "medium"],
+    ["antigravity-gemini-3.8-flash", "gemini-3.8-flash", "medium"],
     ["gemini-3.5-flash-lite", "gemini-3.5-flash-lite", "minimal"],
   ])("routes %s through the public API as %s with strict sampling controls", async (requested, actual, thinkingLevel) => {
     const prepared = await prepareAgySdkGeminiRequest(
@@ -329,6 +330,7 @@ describe("api-key agy sdk support", () => {
     expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent")).toBe(true);
     expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent")).toBe(true);
     expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent")).toBe(true);
+    expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent")).toBe(true);
     expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent")).toBe(true);
     expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent")).toBe(true);
 
@@ -344,6 +346,7 @@ describe("api-key agy sdk support", () => {
     // antigravity-gemini-3.5-flash and antigravity-gemini-3.7-flash strip to the bare public-API natives.
     expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3.5-flash:generateContent")).toBe(true);
     expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3.7-flash:generateContent")).toBe(true);
+    expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3.8-flash:generateContent")).toBe(true);
 
     // Claude (and unmapped antigravity- prefixed ids) have no public-API equivalent.
     expect(isAgySdkSupportedRequest("https://generativelanguage.googleapis.com/v1beta/models/claude-opus-4-6-thinking:generateContent")).toBe(false);
@@ -383,6 +386,7 @@ describe("api-key agy sdk support", () => {
     expect(isAntigravityOnlyGenerativeLanguageRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent")).toBe(false);
     expect(isAntigravityOnlyGenerativeLanguageRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent")).toBe(false);
     expect(isAntigravityOnlyGenerativeLanguageRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent")).toBe(false);
+    expect(isAntigravityOnlyGenerativeLanguageRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent")).toBe(false);
     expect(isAntigravityOnlyGenerativeLanguageRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent")).toBe(false);
     expect(isAntigravityOnlyGenerativeLanguageRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent")).toBe(false);
 

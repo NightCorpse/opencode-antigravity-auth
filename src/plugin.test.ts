@@ -134,7 +134,15 @@ describe("createAntigravityPlugin provider models", () => {
       expect(models?.["antigravity-gemini-3.7-flash"]?.capabilities).toMatchObject({
         reasoning: true,
       });
+      expect(models?.["antigravity-gemini-3.8-flash"]?.capabilities).toMatchObject({
+        temperature: false,
+        reasoning: true,
+      });
       expect(models?.["gemini-3.7-flash"]?.capabilities).toMatchObject({
+        reasoning: true,
+      });
+      expect(models?.["gemini-3.8-flash"]?.capabilities).toMatchObject({
+        temperature: false,
         reasoning: true,
       });
       expect(models?.["gemini-3.5-flash-lite"]?.capabilities).toMatchObject({

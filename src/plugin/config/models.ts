@@ -117,6 +117,17 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
       high: { thinkingLevel: "high" },
     },
   },
+  "antigravity-gemini-3.8-flash": {
+    name: "Gemini 3.8 Flash (Antigravity)",
+    temperature: false,
+    limit: { context: 1048576, output: 65536 },
+    modalities: DEFAULT_MODALITIES,
+    variants: {
+      low: { thinkingLevel: "low" },
+      medium: { thinkingLevel: "medium" },
+      high: { thinkingLevel: "high" },
+    },
+  },
   "antigravity-claude-sonnet-4-6": {
     name: "Claude Sonnet 4.6 (Antigravity)",
     limit: { context: 200000, output: 64000 },
@@ -175,6 +186,17 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
   },
   "gemini-3.7-flash": {
     name: "Gemini 3.7 Flash (Gemini CLI)",
+    temperature: false,
+    limit: { context: 1048576, output: 65536 },
+    modalities: DEFAULT_MODALITIES,
+    variants: {
+      low: { thinkingLevel: "low" },
+      medium: { thinkingLevel: "medium" },
+      high: { thinkingLevel: "high" },
+    },
+  },
+  "gemini-3.8-flash": {
+    name: "Gemini 3.8 Flash (Gemini CLI)",
     temperature: false,
     limit: { context: 1048576, output: 65536 },
     modalities: DEFAULT_MODALITIES,
@@ -243,7 +265,7 @@ function defaultVariantsForModel(modelId: string): Record<string, ModelVariant> 
       };
     }
     if (normalized.includes("flash")) {
-      if (normalized.includes("3.6") || normalized.includes("3.7")) {
+      if (normalized.includes("3.6") || normalized.includes("3.7") || normalized.includes("3.8")) {
         return {
           low: { thinkingLevel: "low" },
           medium: { thinkingLevel: "medium" },

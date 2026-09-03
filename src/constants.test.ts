@@ -1,9 +1,17 @@
 import { describe, it, expect } from "vitest"
 import {
+  ANTIGRAVITY_CLI_USER_AGENT,
   GEMINI_CLI_HEADERS,
   getRandomizedHeaders,
   type HeaderSet,
 } from "./constants.ts"
+
+describe("Antigravity CLI identity", () => {
+  it("includes the CLI product and consumer auth method", () => {
+    expect(ANTIGRAVITY_CLI_USER_AGENT).toMatch(/^antigravity\/cli\/1\.1\.24 /)
+    expect(ANTIGRAVITY_CLI_USER_AGENT).toContain("auth_method=consumer")
+  })
+})
 
 describe("GEMINI_CLI_HEADERS", () => {
   it("matches Code Assist headers from opencode-gemini-auth", () => {

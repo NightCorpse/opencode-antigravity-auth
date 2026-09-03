@@ -273,7 +273,7 @@ export function extractRequestedGeminiModel(urlString: string): string | undefin
  * the API-key path. Kept short and stable; the live registry has more, but these
  * are the high-signal choices for the error hint.
  *
- * Source: GET https://generativelanguage.googleapis.com/v1beta/models (May 2026).
+ * Source: GET https://generativelanguage.googleapis.com/v1beta/models (September 2026).
  */
 const PUBLIC_GEMINI_API_MODEL_SUGGESTIONS = [
   "gemini-2.5-pro",
@@ -283,6 +283,7 @@ const PUBLIC_GEMINI_API_MODEL_SUGGESTIONS = [
   "gemini-3.5-flash",
   "gemini-3.6-flash",
   "gemini-3.7-flash",
+  "gemini-3.8-flash",
 ] as const;
 
 /**

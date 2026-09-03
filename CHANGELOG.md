@@ -4,7 +4,8 @@
 
 ### Added
 
-- **Gemini 3.7 Flash** - Added stable `gemini-3.7-flash` and `antigravity-gemini-3.7-flash` model support with thinking variants (`minimal`, `low`, `medium`, `high`). The `gemini-flash-latest` alias now resolves to `gemini-3.7-flash`.
+- **Gemini 3.8 Flash** - Added `gemini-3.8-flash` and `antigravity-gemini-3.8-flash` with `low`, `medium`, and `high` thinking variants. Antigravity requests map to the tier-specific `gemini-3.8-flash-{low,medium,high}` backend ids, use the Agy CLI consumer identity required by entitlement checks, and default to `medium`. The `gemini-flash-latest` alias now resolves to Gemini 3.8 Flash.
+- **Gemini 3.7 Flash** - Added stable `gemini-3.7-flash` and `antigravity-gemini-3.7-flash` model support with thinking variants (`minimal`, `low`, `medium`, `high`).
 - **Dynamic Antigravity Registry Pulling & Caching** - Discovered Antigravity models from `POST /v1internal:fetchAvailableModels` are now automatically cataloged, cached, and registered with dynamically inferred thinking variants for newly released models. When OpenCode initializes, model discovery can automatically authenticate using configured OAuth accounts to pull the latest models from the Antigravity registry.
 
 - **Gemini 3.6 Flash and Gemini 3.5 Flash-Lite** - Added stable `gemini-3.6-flash` and `gemini-3.5-flash-lite` model support. Gemini 3.6 Flash routes to Antigravity's tier-specific backends with `medium` as the default and remains available through Gemini CLI/API-key routing under its bare model ID. Gemini 3.5 Flash-Lite uses the public Gemini path directly with `minimal` as the default. The `gemini-flash-lite-latest` alias resolves to Gemini 3.5 Flash-Lite, and both models remove deprecated sampling controls before requests are sent.
