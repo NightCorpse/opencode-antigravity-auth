@@ -3,6 +3,7 @@ import { Credential, Model, Plugin, Provider } from "@opencode/plugin"
 import { ANTIGRAVITY_PROVIDER_ID } from "./constants"
 import { createAntigravityPlugin } from "./plugin"
 import type { AntigravityTokenExchangeResult } from "./antigravity/oauth"
+import { OPENCODE_MODEL_DEFINITIONS } from "./plugin/config/models"
 import type {
   AuthMethod,
   AuthDetails,
@@ -14,9 +15,16 @@ import type {
 
 const PLUGIN_ID = "opencode-antigravity-auth"
 const OAUTH_METHOD_ID = "antigravity"
+const PUBLIC_MODEL_IDS = new Set(
+  Object.keys(OPENCODE_MODEL_DEFINITIONS).filter((id) => id.startsWith("antigravity-")),
+)
 function isUnavailableModel(id: string): boolean {
   return id === "antigravity-gemini-3-pro"
     || id.startsWith("antigravity-gemini-3.5-flash")
+}
+
+function isPublicModel(id: string): boolean {
+  return PUBLIC_MODEL_IDS.has(id) && !isUnavailableModel(id)
 }
 
 interface LegacyRequestLoader {
@@ -286,7 +294,7 @@ async function setup(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
     ? await legacy.provider.models(provider, { auth: await resolveLegacyAuth(ctx) })
     : {}
   const v2Models = Object.entries(discoveredModels)
-    .filter(([id]) => !isUnavailableModel(id))
+    .filter(([id]) => isPublicModel(id))
     .map(([id, model]) => toV2Model(id, model))
   const registrations: Array<{ dispose(): Promise<void> }> = []
   const controller = new AbortController()

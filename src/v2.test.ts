@@ -46,6 +46,9 @@ vi.mock("./plugin", () => ({
         "antigravity-gemini-3-pro": {
           name: "Gemini 3 Pro (Antigravity)",
         },
+        "antigravity-gemini-3.8-flash-tiered": {
+          name: "Internal Gemini 3.8 backend",
+        },
         "antigravity-gemini-3.8-flash": {
           name: "Gemini 3.8 Flash (Antigravity)",
           status: "active",
@@ -195,6 +198,7 @@ describe("OpenCodeV2Plugin", () => {
     ]))
     expect(providerModels).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "antigravity-gemini-3-pro" }),
+      expect.objectContaining({ id: "antigravity-gemini-3.8-flash-tiered" }),
     ]))
     expect(removedModels).toEqual([
       "antigravity-gemini-3-pro",
