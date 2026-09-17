@@ -28,6 +28,10 @@
     "engines": {
         "node": ">=20.0.0"
     },
+    "bin": {
+        "opencode-antigravity": "./bin/cli.js",
+        "opencode-agy": "./bin/cli.js"
+    },
     "files": [
         "dist/",
         "README.md",
