@@ -21,8 +21,16 @@ export interface UpdateConfigResult {
 
 export interface OpencodeConfig {
   $schema?: string;
-  plugin?: string[];
+  plugin?: unknown[];
+  plugins?: unknown[];
   provider?: {
+    google?: {
+      models?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  providers?: {
     google?: {
       models?: Record<string, unknown>;
       [key: string]: unknown;
@@ -93,8 +101,9 @@ export function getOpencodeConfigPath(): string {
  *
  * This function:
  * 1. Reads existing opencode.json/opencode.jsonc (or creates default structure)
- * 2. Replaces `provider.google.models` with plugin models
- * 3. Writes back to disk with proper formatting
+ * 2. Uses V2 native keys (`plugins` and `providers`) while supporting legacy V1
+ * 3. Replaces google models with plugin models
+ * 4. Writes back to disk with proper formatting
  *
  * Preserves:
  * - $schema and other top-level config keys
@@ -117,11 +126,11 @@ export async function updateOpencodeConfig(
       const content = readFileSync(configPath, "utf-8");
       config = JSON.parse(stripJsonCommentsAndTrailingCommas(content)) as OpencodeConfig;
     } else {
-      // Create default config structure
+      // Create default V2 config structure
       config = {
         $schema: SCHEMA_URL,
-        plugin: [],
-        provider: {},
+        plugins: [],
+        providers: {},
       };
     }
 
@@ -130,29 +139,64 @@ export async function updateOpencodeConfig(
       config.$schema = SCHEMA_URL;
     }
 
-    // Ensure plugin array exists and contains our plugin
-    if (!Array.isArray(config.plugin)) {
-      config.plugin = [];
+    // Determine target plugins list (prefer V2 `plugins`, fallback to legacy `plugin`)
+    const hasV2Plugins = Array.isArray(config.plugins);
+    const hasV1Plugin = Array.isArray(config.plugin);
+
+    let targetPluginsList: unknown[];
+    if (hasV2Plugins) {
+      targetPluginsList = config.plugins!;
+    } else if (hasV1Plugin) {
+      // Migrate V1 `plugin` to V2 `plugins`
+      config.plugins = [...config.plugin!];
+      delete config.plugin;
+      targetPluginsList = config.plugins;
+    } else {
+      config.plugins = [];
+      targetPluginsList = config.plugins;
     }
 
-    // Check if plugin is already in the list (any version)
-    const hasPlugin = config.plugin.some((p) =>
-      p.includes("opencode-antigravity-auth")
-    );
+    // Check if plugin is already in the list (package name or local path or object)
+    const hasPlugin = targetPluginsList.some((item) => {
+      if (typeof item === "string") {
+        return item.includes("opencode-antigravity-auth");
+      }
+      if (item && typeof item === "object" && "package" in item) {
+        return String((item as { package: unknown }).package).includes("opencode-antigravity-auth");
+      }
+      return false;
+    });
+
     if (!hasPlugin) {
-      config.plugin.push(PLUGIN_NAME);
+      targetPluginsList.push(PLUGIN_NAME);
     }
 
-    // Ensure provider.google structure exists
-    if (!config.provider) {
-      config.provider = {};
+    // Determine target providers section (prefer V2 `providers`, fallback to legacy `provider`)
+    const hasV2Providers = config.providers && typeof config.providers === "object";
+    const hasV1Provider = config.provider && typeof config.provider === "object";
+
+    let targetProviders: Record<string, unknown>;
+    if (hasV2Providers) {
+      targetProviders = config.providers!;
+    } else if (hasV1Provider) {
+      // Migrate V1 `provider` to V2 `providers`
+      config.providers = { ...config.provider! };
+      delete config.provider;
+      targetProviders = config.providers;
+    } else {
+      config.providers = {};
+      targetProviders = config.providers;
     }
-    if (!config.provider.google) {
-      config.provider.google = {};
+
+    // Ensure google provider object exists
+    if (!targetProviders.google || typeof targetProviders.google !== "object") {
+      targetProviders.google = {};
     }
+
+    const googleProvider = targetProviders.google as Record<string, unknown>;
 
     // Replace google models with plugin models
-    config.provider.google.models = { ...OPENCODE_MODEL_DEFINITIONS };
+    googleProvider.models = { ...OPENCODE_MODEL_DEFINITIONS };
 
     // Ensure config directory exists
     const configDir = dirname(configPath);
