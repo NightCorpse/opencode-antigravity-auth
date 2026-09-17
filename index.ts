@@ -12,3 +12,5 @@ export type {
   AntigravityAuthorization,
   AntigravityTokenExchangeResult,
 } from "./src/antigravity/oauth";
+
+export { OpenCodeV2Plugin as default } from "./src/v2";
