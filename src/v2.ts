@@ -19,6 +19,8 @@ interface LegacyRequestLoader {
   fetch(input: RequestInfo, init?: RequestInit): Promise<Response>
 }
 
+const INTERCEPT_URL_PREFIX = "data:application/octet-stream,opencode-antigravity-"
+
 interface LegacyTool {
   description: string
   execute(
@@ -193,12 +195,29 @@ async function setup(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
   )
 
   if (hasRequestLoader(loader)) {
+    const responses = new Map<string, Response>()
     registrations.push(
-      await ctx.aisdk.hook(
-        "sdk",
+      await ctx.session.hook(
+        "http.request",
+        async (event) => {
+          const id = crypto.randomUUID()
+          const response = await loader.fetch(event.request)
+          responses.set(id, response)
+          event.request = new Request(`${INTERCEPT_URL_PREFIX}${id}`)
+        },
+        { providerID: ANTIGRAVITY_PROVIDER_ID },
+      ),
+      await ctx.session.hook(
+        "http.response",
         (event) => {
-          event.options.apiKey ??= loader.apiKey || "antigravity-oauth"
-          event.options.fetch = loader.fetch
+          if (!event.request.url.startsWith(INTERCEPT_URL_PREFIX)) return
+          const id = event.request.url.slice(INTERCEPT_URL_PREFIX.length)
+          const response = responses.get(id)
+          if (!response) {
+            throw new Error("Missing intercepted Antigravity response")
+          }
+          responses.delete(id)
+          event.response = response
         },
         { providerID: ANTIGRAVITY_PROVIDER_ID },
       ),

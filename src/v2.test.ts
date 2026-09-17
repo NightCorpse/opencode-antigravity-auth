@@ -49,7 +49,8 @@ import { OpenCodeV2Plugin } from "./v2"
 describe("OpenCodeV2Plugin", () => {
   it("registers the legacy fetch pipeline and OAuth method", async () => {
     const dispose = vi.fn(async () => undefined)
-    let sdkHook: ((event: { options: Record<string, unknown> }) => void) | undefined
+    let requestHook: ((event: { request: Request }) => Promise<void>) | undefined
+    let responseHook: ((event: { request: Request; response: Response }) => void) | undefined
     let oauthRegistration: {
       authorize: () => Promise<{
         mode: "code"
@@ -84,9 +85,10 @@ describe("OpenCodeV2Plugin", () => {
           return { dispose }
         },
       },
-      aisdk: {
-        hook: async (_name: string, callback: typeof sdkHook) => {
-          sdkHook = callback
+      session: {
+        hook: async (name: string, callback: typeof requestHook | typeof responseHook) => {
+          if (name === "http.request") requestHook = callback as typeof requestHook
+          if (name === "http.response") responseHook = callback as typeof responseHook
           return { dispose }
         },
       },
@@ -116,12 +118,20 @@ describe("OpenCodeV2Plugin", () => {
     } as unknown as Plugin.Context
 
     const cleanup = await OpenCodeV2Plugin.setup(context)
-    const event = { options: {} as Record<string, unknown> }
-    sdkHook?.(event)
+    const requestEvent = {
+      request: new Request("https://generativelanguage.googleapis.com/v1/models/test"),
+    }
+    await requestHook?.(requestEvent)
+    const responseEvent = {
+      request: requestEvent.request,
+      response: new Response("placeholder"),
+    }
+    responseHook?.(responseEvent)
 
     expect(state.loader).toHaveBeenCalledOnce()
-    expect(event.options.fetch).toBe(state.fetch)
-    expect(event.options.apiKey).toBe("antigravity-oauth")
+    expect(state.fetch).toHaveBeenCalledOnce()
+    expect(requestEvent.request.url).toContain("opencode-antigravity-")
+    expect(await responseEvent.response.text()).toBe("ok")
     expect(oauthRegistration).toBeDefined()
     expect(googleSearch).toBeDefined()
 
@@ -142,6 +152,6 @@ describe("OpenCodeV2Plugin", () => {
     expect(toolResult).toEqual({ content: "result" })
 
     await cleanup?.()
-    expect(dispose).toHaveBeenCalledTimes(4)
+    expect(dispose).toHaveBeenCalledTimes(5)
   })
 })
