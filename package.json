@@ -38,6 +38,8 @@
         "LICENSE"
     ],
     "scripts": {
+        "postinstall": "node script/install-bin.js",
+        "link-bin": "node script/install-bin.js",
         "build": "tsc -p tsconfig.build.json",
         "build:schema": "npx tsx script/build-schema.ts",
         "typecheck": "tsc --noEmit",
