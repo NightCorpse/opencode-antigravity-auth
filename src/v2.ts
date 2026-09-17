@@ -1,8 +1,10 @@
-import { Plugin } from "@opencode/plugin"
+import { Credential, Plugin } from "@opencode/plugin"
 
 import { ANTIGRAVITY_PROVIDER_ID } from "./constants"
 import { createAntigravityPlugin } from "./plugin"
+import type { AntigravityTokenExchangeResult } from "./antigravity/oauth"
 import type {
+  AuthMethod,
   AuthDetails,
   PluginClient,
   PluginContext,
@@ -10,6 +12,7 @@ import type {
 } from "./plugin/types"
 
 const PLUGIN_ID = "opencode-antigravity-auth"
+const OAUTH_METHOD_ID = "antigravity"
 
 interface LegacyRequestLoader {
   apiKey: string
@@ -98,6 +101,51 @@ async function resolveLegacyAuth(ctx: Plugin.Context): Promise<AuthDetails> {
   return { type: "api", key: credential.key }
 }
 
+function toOAuthCredential(result: AntigravityTokenExchangeResult): Credential.OAuth {
+  if (result.type === "failed") {
+    throw new Error(result.error)
+  }
+
+  return {
+    type: "oauth",
+    methodID: OAUTH_METHOD_ID as Credential.OAuth["methodID"],
+    refresh: result.refresh,
+    access: result.access,
+    expires: result.expires,
+    metadata: {
+      email: result.email,
+      projectId: result.projectId,
+    },
+  }
+}
+
+async function authorizeV2(method: AuthMethod) {
+  if (!method.authorize) {
+    throw new Error("Antigravity OAuth method has no authorization handler")
+  }
+
+  const authorization = await method.authorize()
+  if (authorization.method === "auto") {
+    return {
+      url: authorization.url,
+      instructions: authorization.instructions,
+      mode: "auto" as const,
+      callback: authorization.callback().then(toOAuthCredential),
+    }
+  }
+
+  return {
+    url: authorization.url,
+    instructions: authorization.instructions,
+    mode: "code" as const,
+    callback: async (code: string) => toOAuthCredential(await authorization.callback(code)),
+  }
+}
+
+function eventProperties(event: object): unknown {
+  return "data" in event ? event.data : undefined
+}
+
 async function setup(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
   const client = createLegacyClient(ctx)
   const legacyContext: PluginContext = {
@@ -108,6 +156,7 @@ async function setup(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
   const provider: Provider = { id: ANTIGRAVITY_PROVIDER_ID, models: {} }
   const loader = await legacy.auth.loader(() => resolveLegacyAuth(ctx), provider)
   const registrations: Array<{ dispose(): Promise<void> }> = []
+  const controller = new AbortController()
 
   registrations.push(
     await ctx.provider.transform((editor) => {
@@ -134,8 +183,48 @@ async function setup(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
     )
   }
 
+  const oauthMethod = legacy.auth.methods.find((method) => method.type === "oauth")
+  if (oauthMethod) {
+    registrations.push(
+      await ctx.integration.transform((editor) => {
+        editor.method.update({
+          integrationID: ANTIGRAVITY_PROVIDER_ID,
+          method: {
+            id: OAUTH_METHOD_ID,
+            type: "oauth",
+            label: oauthMethod.label,
+          },
+          authorize: () => authorizeV2(oauthMethod),
+          label: (credential) => {
+            const email = credential.metadata?.email
+            return typeof email === "string" ? email : undefined
+          },
+        })
+      }),
+    )
+  }
+
+  const eventTask = legacy.event
+    ? (async () => {
+        try {
+          for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+            await legacy.event?.({
+              event: {
+                type: event.type,
+                properties: eventProperties(event),
+              },
+            })
+          }
+        } catch (error) {
+          if (!controller.signal.aborted) throw error
+        }
+      })()
+    : Promise.resolve()
+
   return async () => {
+    controller.abort()
     await Promise.all(registrations.map((registration) => registration.dispose()))
+    await eventTask
   }
 }
 
