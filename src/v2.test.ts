@@ -35,6 +35,12 @@ vi.mock("./plugin", () => ({
         },
       ],
     },
+    tool: {
+      google_search: {
+        description: "Search Google",
+        execute: async () => "result",
+      },
+    },
   }),
 }))
 
@@ -54,6 +60,13 @@ describe("OpenCodeV2Plugin", () => {
           metadata?: Record<string, unknown>
         }>
       }>
+    } | undefined
+    let googleSearch: {
+      execute: (input: unknown, context: {
+        sessionID: string
+        messageID: string
+        agent: string
+      }) => Promise<{ content?: string }>
     } | undefined
 
     const context = {
@@ -92,6 +105,14 @@ describe("OpenCodeV2Plugin", () => {
       event: {
         subscribe: async function* () {},
       },
+      tool: {
+        transform: async (callback: (editor: {
+          add: (definition: typeof googleSearch) => void
+        }) => void) => {
+          callback({ add: (definition) => { googleSearch = definition } })
+          return { dispose }
+        },
+      },
     } as unknown as Plugin.Context
 
     const cleanup = await OpenCodeV2Plugin.setup(context)
@@ -102,6 +123,7 @@ describe("OpenCodeV2Plugin", () => {
     expect(event.options.fetch).toBe(state.fetch)
     expect(event.options.apiKey).toBe("antigravity-oauth")
     expect(oauthRegistration).toBeDefined()
+    expect(googleSearch).toBeDefined()
 
     const authorization = await oauthRegistration?.authorize()
     expect(authorization?.mode).toBe("code")
@@ -113,7 +135,13 @@ describe("OpenCodeV2Plugin", () => {
       metadata: { email: "user@example.com", projectId: "project" },
     })
 
+    const toolResult = await googleSearch?.execute(
+      { query: "OpenCode" },
+      { sessionID: "session", messageID: "message", agent: "build" },
+    )
+    expect(toolResult).toEqual({ content: "result" })
+
     await cleanup?.()
-    expect(dispose).toHaveBeenCalledTimes(3)
+    expect(dispose).toHaveBeenCalledTimes(4)
   })
 })

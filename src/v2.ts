@@ -19,8 +19,30 @@ interface LegacyRequestLoader {
   fetch(input: RequestInfo, init?: RequestInit): Promise<Response>
 }
 
+interface LegacyTool {
+  description: string
+  execute(
+    input: Record<string, unknown>,
+    context: {
+      sessionID: string
+      messageID: string
+      agent: string
+      abort: AbortSignal
+    },
+  ): Promise<string>
+}
+
 function hasRequestLoader(value: object): value is LegacyRequestLoader {
   return "fetch" in value && typeof value.fetch === "function"
+}
+
+function isLegacyTool(value: unknown): value is LegacyTool {
+  return typeof value === "object"
+    && value !== null
+    && "description" in value
+    && typeof value.description === "string"
+    && "execute" in value
+    && typeof value.execute === "function"
 }
 
 function logLegacyMessage(level: string, message: string): void {
@@ -198,6 +220,51 @@ async function setup(ctx: Plugin.Context): Promise<Plugin.Cleanup> {
           label: (credential) => {
             const email = credential.metadata?.email
             return typeof email === "string" ? email : undefined
+          },
+        })
+      }),
+    )
+  }
+
+  const googleSearch = legacy.tool?.google_search
+  if (isLegacyTool(googleSearch)) {
+    registrations.push(
+      await ctx.tool.transform((editor) => {
+        editor.add({
+          name: "google_search",
+          description: googleSearch.description,
+          input: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The search query or question to answer using web search",
+              },
+              urls: {
+                type: "array",
+                items: { type: "string" },
+                description: "Specific URLs to fetch and analyze",
+              },
+              thinking: {
+                type: "boolean",
+                description: "Enable deep thinking for a more thorough analysis",
+                default: true,
+              },
+            },
+            required: ["query"],
+            additionalProperties: false,
+          },
+          async execute(input, tool) {
+            const content = await googleSearch.execute(
+              input as Record<string, unknown>,
+              {
+                sessionID: tool.sessionID,
+                messageID: tool.messageID,
+                agent: tool.agent,
+                abort: new AbortController().signal,
+              },
+            )
+            return { content }
           },
         })
       }),
