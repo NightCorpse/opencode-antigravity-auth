@@ -123,10 +123,10 @@ opencode run "Hello" --model=google/antigravity-claude-opus-4-6-thinking --varia
 
 | Model | Variants | Notes |
 |-------|----------|-------|
-| `antigravity-gemini-3-pro` | low, high | Gemini 3 Pro with thinking |
+| ~~`antigravity-gemini-3-pro`~~ | low, high | Discontinued by Google |
 | `antigravity-gemini-3.1-pro` | low, high | Gemini 3.1 Pro with thinking (rollout-dependent) |
 | `antigravity-gemini-3-flash` | minimal, low, medium, high | Gemini 3 Flash with thinking |
-| `antigravity-gemini-3.5-flash` | minimal, low, medium, high | Gemini 3.5 Flash with thinking (rollout-dependent) |
+| ~~`antigravity-gemini-3.5-flash`~~ | minimal, low, medium, high | Discontinued by Google |
 | `antigravity-gemini-3.6-flash` | low, medium, high | Gemini 3.6 Flash with thinking (medium default) |
 | `antigravity-gemini-3.7-flash` | minimal, low, medium, high | Gemini 3.7 Flash with thinking |
 | `antigravity-gemini-3.8-flash` | low, medium, high | Gemini 3.8 Flash with thinking (medium default) |
@@ -144,12 +144,12 @@ The official Antigravity SDK uses `GEMINI_API_KEY` for local Gemini access. This
 | `gemini-2.5-flash` | Gemini 2.5 Flash |
 | `gemini-2.5-pro` | Gemini 2.5 Pro |
 | `gemini-3-flash-preview` | Gemini 3 Flash (preview) |
-| `gemini-3.5-flash` | Gemini 3.5 Flash (rollout-dependent) |
+| ~~`gemini-3.5-flash`~~ | Discontinued by Google |
 | `gemini-3.5-flash-lite` | Gemini 3.5 Flash-Lite (minimal default) |
 | `gemini-3.6-flash` | Gemini 3.6 Flash (medium default) |
 | `gemini-3.7-flash` | Gemini 3.7 Flash |
 | `gemini-3.8-flash` | Gemini 3.8 Flash (medium default) |
-| `gemini-3-pro-preview` | Gemini 3 Pro (preview) |
+| ~~`gemini-3-pro-preview`~~ | Discontinued by Google |
 | `gemini-3.1-pro` | Gemini 3.1 Pro |
 | `gemini-3.1-pro-preview-customtools` | Gemini 3.1 Pro Preview Custom Tools |
 
@@ -536,7 +536,7 @@ If you encounter errors during a session:
 {
   "google_auth": false,
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro" },
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3.1-pro#high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" }
   }
 }
@@ -674,7 +674,7 @@ Disable built-in auth and override agent models in `oh-my-opencode.json`:
 {
   "google_auth": false,
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro" },
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3.1-pro#high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
     "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
