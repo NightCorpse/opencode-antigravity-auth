@@ -34,6 +34,10 @@ vi.mock("./plugin/storage", async (importOriginal) => {
   };
 });
 
+// Keep tests independent from the user's ~/.config/opencode/antigravity.json
+// while still allowing individual tests to point at their own config directory.
+process.env.OPENCODE_CONFIG_DIR = join(tmpdir(), `opencode-antigravity-test-${process.pid}`);
+
 const { createAntigravityPlugin, loopEscapeTestHooks, __testExports } = await import("./plugin");
 const storageModule = await import("./plugin/storage");
 const { resetPublicGeminiApiModelCatalogForTests } = await import("./plugin/model-catalog");
