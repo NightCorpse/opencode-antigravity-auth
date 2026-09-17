@@ -52,7 +52,17 @@ Install the opencode-antigravity-auth plugin and add the Antigravity model defin
 
 **Option B: Manual setup**
 
-1. **Add the plugin** to `~/.config/opencode/opencode.json`:
+1. **Add the plugin** to `~/.config/opencode/opencode.json`.
+
+   OpenCode 2:
+
+   ```json
+   {
+     "plugins": ["opencode-antigravity-auth@latest"]
+   }
+   ```
+
+   OpenCode 1 remains supported through the package's named V1 exports:
 
    ```json
    {
@@ -615,24 +625,24 @@ ssh -L 51121:localhost:51121 user@remote
 
 ---
 
-### Configuration Key Typo: `plugin` not `plugins`
+### Plugin Configuration Key
 
-The correct key is `plugin` (singular):
+OpenCode 2 uses `plugins` (plural):
 
 ```json
 {
-  "plugin": ["opencode-antigravity-auth@beta"]
+  "plugins": ["opencode-antigravity-auth@beta"]
 }
 ```
 
-**Not** `"plugins"` (will cause "Unrecognized key" error).
+OpenCode 1 uses the legacy `plugin` (singular) key instead.
 
 ---
 
 ### Migrating Accounts Between Machines
 
 When copying `antigravity-accounts.json` to a new machine:
-1. Ensure the plugin is installed: `"plugin": ["opencode-antigravity-auth@beta"]`
+1. Ensure the plugin is installed: `"plugins": ["opencode-antigravity-auth@beta"]` (OpenCode 2) or `"plugin": ["opencode-antigravity-auth@beta"]` (OpenCode 1)
 2. Copy `~/.config/opencode/antigravity-accounts.json`
 3. If you get "API key missing" error, the refresh token may be invalid — re-authenticate
 
