@@ -900,6 +900,7 @@ async function promptOpenVerificationUrl(): Promise<boolean> {
 
 type VerificationStoredAccount = {
   enabled?: boolean;
+  enabledUpdatedAt?: number;
   verificationRequired?: boolean;
   verificationRequiredAt?: number;
   verificationRequiredReason?: string;
@@ -936,17 +937,11 @@ function markStoredAccountVerificationRequired(
     changed = true;
   }
 
-  if (account.enabled !== false) {
-    account.enabled = false;
-    changed = true;
-  }
-
   return changed;
 }
 
 function clearStoredAccountVerificationRequired(
   account: VerificationStoredAccount,
-  enableIfRequired = false,
 ): { changed: boolean; wasVerificationRequired: boolean } {
   const wasVerificationRequired = account.verificationRequired === true;
   let changed = false;
@@ -965,11 +960,6 @@ function clearStoredAccountVerificationRequired(
   }
   if (account.verificationUrl !== undefined) {
     account.verificationUrl = undefined;
-    changed = true;
-  }
-
-  if (enableIfRequired && wasVerificationRequired && account.enabled === false) {
-    account.enabled = true;
     changed = true;
   }
 
@@ -2901,7 +2891,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                       accountManager.markToastShown(account.index);
                     }
 
-                    pushDebug(`verification-required: disabled account ${account.index}`);
+                    pushDebug(`verification-required: account ${account.index} temporarily unavailable`);
                     getHealthTracker().recordFailure(account.index);
 
                     lastFailure = createFailureContext(response);
@@ -3397,6 +3387,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     const acc = existingStorage.accounts[menuResult.toggleAccountIndex];
                     if (acc) {
                       acc.enabled = acc.enabled === false;
+                      acc.enabledUpdatedAt = Date.now();
                       await saveAccounts(existingStorage);
                       activeAccountManager?.setAccountEnabled(menuResult.toggleAccountIndex, acc.enabled);
                       console.log(`\nAccount ${acc.email || menuResult.toggleAccountIndex + 1} ${acc.enabled ? 'enabled' : 'disabled'}.\n`);
@@ -3434,11 +3425,11 @@ export const createAntigravityPlugin = (providerId: string) => async (
 
                       const verification = await verifyAccountAccess(account, client, providerId);
                       if (verification.status === "ok") {
-                        const { changed, wasVerificationRequired } = clearStoredAccountVerificationRequired(account, true);
+                        const { changed } = clearStoredAccountVerificationRequired(account);
                         if (changed) {
                           storageUpdated = true;
                         }
-                        activeAccountManager?.clearAccountVerificationRequired(i, wasVerificationRequired);
+                        activeAccountManager?.clearAccountVerificationRequired(i);
                         okCount += 1;
                         console.log("ok");
                         continue;
@@ -3520,14 +3511,14 @@ export const createAntigravityPlugin = (providerId: string) => async (
                   const verification = await verifyAccountAccess(account, client, providerId);
 
                   if (verification.status === "ok") {
-                    const { changed, wasVerificationRequired } = clearStoredAccountVerificationRequired(account, true);
+                    const { changed, wasVerificationRequired } = clearStoredAccountVerificationRequired(account);
                     if (changed) {
                       await saveAccounts(existingStorage);
                     }
-                    activeAccountManager?.clearAccountVerificationRequired(verifyAccountIndex, wasVerificationRequired);
+                    activeAccountManager?.clearAccountVerificationRequired(verifyAccountIndex);
 
                     if (wasVerificationRequired) {
-                      console.log(`✓ ${label} is ready for requests and has been re-enabled.\n`);
+                      console.log(`✓ ${label} is ready for requests.\n`);
                     } else {
                       console.log(`✓ ${label} is ready for requests.\n`);
                     }
@@ -3555,7 +3546,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     if (verification.message) {
                       console.log(verification.message);
                     }
-                    console.log(`${label} has been disabled until verification is completed.`);
+                    console.log(`${label} is temporarily unavailable until verification is completed.`);
                     if (verifyUrl) {
                       console.log(`\nVerification URL:\n${verifyUrl}\n`);
                       if (await promptOpenVerificationUrl()) {
@@ -3803,6 +3794,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     const parts = parseRefreshParts(result.refresh);
                     if (parts.refreshToken) {
                       updatedAccounts[refreshAccountIndex] = {
+                        ...updatedAccounts[refreshAccountIndex],
                         email: result.email ?? updatedAccounts[refreshAccountIndex]?.email,
                         refreshToken: parts.refreshToken,
                         projectId: parts.projectId ?? updatedAccounts[refreshAccountIndex]?.projectId,

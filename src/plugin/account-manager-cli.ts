@@ -227,16 +227,11 @@ function markStoredAccountVerificationRequired(
     account.verificationUrl = verifyUrl;
     changed = true;
   }
-  if (account.enabled !== false) {
-    account.enabled = false;
-    changed = true;
-  }
   return changed;
 }
 
 function clearStoredAccountVerificationRequired(
   account: AccountMetadataV3,
-  enableIfRequired = false,
 ): { changed: boolean; wasVerificationRequired: boolean } {
   const wasVerificationRequired = account.verificationRequired === true;
   let changed = false;
@@ -255,11 +250,6 @@ function clearStoredAccountVerificationRequired(
   }
   if (account.verificationUrl !== undefined) {
     account.verificationUrl = undefined;
-    changed = true;
-  }
-
-  if (enableIfRequired && wasVerificationRequired && account.enabled === false) {
-    account.enabled = true;
     changed = true;
   }
 
@@ -584,6 +574,7 @@ export async function runInteractiveAccountManager(
           const acc = existingStorage.accounts[menuResult.toggleAccountIndex];
           if (acc) {
             acc.enabled = acc.enabled === false;
+            acc.enabledUpdatedAt = Date.now();
             await saveAccounts(existingStorage);
             console.log(
               `\nAccount ${acc.email || menuResult.toggleAccountIndex + 1} ${acc.enabled ? "enabled" : "disabled"}.\n`,
@@ -637,7 +628,6 @@ export async function runInteractiveAccountManager(
             if (verification.status === "ok") {
               const { changed } = clearStoredAccountVerificationRequired(
                 account,
-                true,
               );
               if (changed) {
                 storageUpdated = true;
@@ -727,14 +717,14 @@ export async function runInteractiveAccountManager(
 
         if (verification.status === "ok") {
           const { changed, wasVerificationRequired } =
-            clearStoredAccountVerificationRequired(account, true);
+            clearStoredAccountVerificationRequired(account);
           if (changed) {
             await saveAccounts(existingStorage);
           }
 
           if (wasVerificationRequired) {
             console.log(
-              `✓ ${label} is ready for requests and has been re-enabled.\n`,
+              `✓ ${label} is ready for requests.\n`,
             );
           } else {
             console.log(`✓ ${label} is ready for requests.\n`);
@@ -760,7 +750,7 @@ export async function runInteractiveAccountManager(
           if (verification.message) {
             console.log(verification.message);
           }
-          console.log(`${label} has been disabled until verification is completed.`);
+          console.log(`${label} is temporarily unavailable until verification is completed.`);
           if (verifyUrl) {
             console.log(`\nVerification URL:\n${verifyUrl}\n`);
             if (await promptOpenVerificationUrl()) {
@@ -905,6 +895,7 @@ export async function runInteractiveAccountManager(
         const parts = parseRefreshParts(result.refresh);
         if (parts.refreshToken) {
           updatedAccounts[refreshAccountIndex] = {
+            ...updatedAccounts[refreshAccountIndex],
             email: result.email ?? updatedAccounts[refreshAccountIndex]?.email,
             refreshToken: parts.refreshToken,
             projectId:

@@ -884,6 +884,95 @@ describe("saveAccounts merge — cleared rate limits are not resurrected", () =>
     expect(tokens).toEqual(["disk", "mem"]);
   });
 
+  it("preserves a newer enabled state against a stale process snapshot", async () => {
+    mockDisk({
+      version: 4,
+      accounts: [{
+        refreshToken: "r1",
+        addedAt: 1,
+        lastUsed: 5,
+        enabled: true,
+        enabledUpdatedAt: 200,
+      }],
+      activeIndex: 0,
+    });
+
+    await saveAccounts({
+      version: 4,
+      accounts: [{
+        refreshToken: "r1",
+        addedAt: 1,
+        lastUsed: 6,
+        enabled: false,
+        enabledUpdatedAt: 100,
+      }],
+      activeIndex: 0,
+    });
+
+    const account = readMergedSnapshot().accounts[0];
+    expect(account?.enabled).toBe(true);
+    expect(account?.enabledUpdatedAt).toBe(200);
+  });
+
+  it("applies a newer disabled state over an older enabled state", async () => {
+    mockDisk({
+      version: 4,
+      accounts: [{
+        refreshToken: "r1",
+        addedAt: 1,
+        lastUsed: 5,
+        enabled: true,
+        enabledUpdatedAt: 100,
+      }],
+      activeIndex: 0,
+    });
+
+    await saveAccounts({
+      version: 4,
+      accounts: [{
+        refreshToken: "r1",
+        addedAt: 1,
+        lastUsed: 6,
+        enabled: false,
+        enabledUpdatedAt: 200,
+      }],
+      activeIndex: 0,
+    });
+
+    const account = readMergedSnapshot().accounts[0];
+    expect(account?.enabled).toBe(false);
+    expect(account?.enabledUpdatedAt).toBe(200);
+  });
+
+  it("prefers a timestamped toggle over a legacy snapshot without a timestamp", async () => {
+    mockDisk({
+      version: 4,
+      accounts: [{
+        refreshToken: "r1",
+        addedAt: 1,
+        lastUsed: 5,
+        enabled: true,
+        enabledUpdatedAt: 200,
+      }],
+      activeIndex: 0,
+    });
+
+    await saveAccounts({
+      version: 4,
+      accounts: [{
+        refreshToken: "r1",
+        addedAt: 1,
+        lastUsed: 6,
+        enabled: false,
+      }],
+      activeIndex: 0,
+    });
+
+    const account = readMergedSnapshot().accounts[0];
+    expect(account?.enabled).toBe(true);
+    expect(account?.enabledUpdatedAt).toBe(200);
+  });
+
   describe("conflicts resolve by mutation order (setAt vs clearedAt)", () => {
     const nowTs = Date.now();
     const FUTURE = nowTs + 1_000_000_000;

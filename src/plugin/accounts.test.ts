@@ -59,6 +59,49 @@ describe("AccountManager", () => {
     expect(account?.index).toBe(0);
   });
 
+  it("keeps user enabled state while excluding verification-blocked accounts", () => {
+    const stored: AccountStorageV4 = {
+      version: 4,
+      accounts: [
+        { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0, enabled: true },
+        { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0, enabled: true },
+      ],
+      activeIndex: 0,
+    };
+
+    const manager = new AccountManager(undefined, stored);
+    manager.markAccountVerificationRequired(0, "Verification required");
+
+    expect(manager.getAccountsSnapshot()[0]).toMatchObject({
+      enabled: true,
+      verificationRequired: true,
+    });
+    expect(manager.getCurrentOrNextForFamily("gemini")?.index).toBe(1);
+  });
+
+  it("does not enable a user-disabled account when verification is cleared", () => {
+    const stored: AccountStorageV4 = {
+      version: 4,
+      accounts: [{
+        refreshToken: "r1",
+        projectId: "p1",
+        addedAt: 1,
+        lastUsed: 0,
+        enabled: false,
+        verificationRequired: true,
+      }],
+      activeIndex: 0,
+    };
+
+    const manager = new AccountManager(undefined, stored);
+    manager.clearAccountVerificationRequired(0);
+
+    expect(manager.getAccountsSnapshot()[0]).toMatchObject({
+      enabled: false,
+      verificationRequired: false,
+    });
+  });
+
   it("switches to next account when current is rate-limited for family", () => {
     const stored: AccountStorageV4 = {
       version: 4,

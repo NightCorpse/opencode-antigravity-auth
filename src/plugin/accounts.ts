@@ -180,6 +180,7 @@ export interface ManagedAccount {
   /** Cached quota data from last checkAccountsQuota() call */
   cachedQuota?: Partial<Record<QuotaGroup, QuotaGroupSummary>>;
   cachedQuotaUpdatedAt?: number;
+  enabledUpdatedAt?: number;
   verificationRequired?: boolean;
   verificationRequiredAt?: number;
   verificationRequiredReason?: string;
@@ -485,6 +486,7 @@ export class AccountManager {
             access: matchesFallback ? authFallback?.access : undefined,
             expires: matchesFallback ? authFallback?.expires : undefined,
             enabled: acc.enabled !== false,
+            enabledUpdatedAt: acc.enabledUpdatedAt,
             rateLimitResetTimes: acc.rateLimitResetTimes ?? {},
             rateLimitSetTimes: sanitizeRateLimitSetTimes(acc.rateLimitSetTimes, acc.rateLimitResetTimes),
             clearedQuotaKeys: clearedQuotaKeys,
@@ -595,8 +597,8 @@ export class AccountManager {
     const currentIndex = this.currentAccountIndexByFamily[family];
     if (currentIndex >= 0 && currentIndex < this.accounts.length) {
       const account = this.accounts[currentIndex] ?? null;
-      // Only return account if it's enabled - disabled accounts should not be selected
-      if (account && account.enabled !== false) {
+      // enabled is user intent; verificationRequired is operational availability.
+      if (account && account.enabled !== false && account.verificationRequired !== true) {
         return account;
       }
     }
@@ -646,7 +648,7 @@ export class AccountManager {
       const tokenTracker = getTokenTracker();
       
       const accountsWithMetrics: AccountWithMetrics[] = this.accounts
-        .filter(acc => acc.enabled !== false && !excludeIndices?.has(acc.index))
+        .filter(acc => acc.enabled !== false && acc.verificationRequired !== true && !excludeIndices?.has(acc.index))
         .map(acc => {
           clearExpiredRateLimits(acc);
           return {
@@ -715,6 +717,7 @@ export class AccountManager {
     const available = this.accounts.filter((a) => {
       clearExpiredRateLimits(a);
       return a.enabled !== false &&
+             a.verificationRequired !== true &&
              !excludeIndices?.has(a.index) &&
              !isRateLimitedForHeaderStyle(a, family, headerStyle, model) &&
              !isOverSoftQuotaThreshold(a, family, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs, model) &&
@@ -896,7 +899,11 @@ export class AccountManager {
     if (!account) {
       return false;
     }
+    if (account.enabled === enabled) {
+      return true;
+    }
     account.enabled = enabled;
+    account.enabledUpdatedAt = nowMs();
 
     if (!enabled) {
       for (const family of Object.keys(this.currentAccountIndexByFamily) as ModelFamily[]) {
@@ -926,16 +933,12 @@ export class AccountManager {
       account.verificationUrl = normalizedVerifyUrl;
     }
 
-    if (account.enabled !== false) {
-      this.setAccountEnabled(accountIndex, false);
-    } else {
-      this.requestSaveToDisk();
-    }
+    this.requestSaveToDisk();
 
     return true;
   }
 
-  clearAccountVerificationRequired(accountIndex: number, enableAccount = false): boolean {
+  clearAccountVerificationRequired(accountIndex: number): boolean {
     const account = this.accounts[accountIndex];
     if (!account) {
       return false;
@@ -953,9 +956,7 @@ export class AccountManager {
     account.verificationRequiredReason = undefined;
     account.verificationUrl = undefined;
 
-    if (enableAccount && wasVerificationRequired && account.enabled === false) {
-      this.setAccountEnabled(accountIndex, true);
-    } else if (wasVerificationRequired || hadMetadata) {
+    if (wasVerificationRequired || hadMetadata) {
       this.requestSaveToDisk();
     }
 
@@ -1153,6 +1154,7 @@ export class AccountManager {
         addedAt: a.addedAt,
         lastUsed: a.lastUsed,
         enabled: a.enabled,
+        enabledUpdatedAt: a.enabledUpdatedAt,
         rateLimitResetTimes: { ...a.rateLimitResetTimes },
         // Emit per-key SET timestamps and clear markers so mergeAccountStorage can
         // resolve conflicts by mutation order (latest setAt vs clearedAt wins),

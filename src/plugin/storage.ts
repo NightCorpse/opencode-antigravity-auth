@@ -186,6 +186,8 @@ export interface AccountMetadataV3 {
   addedAt: number;
   lastUsed: number;
   enabled?: boolean;
+  /** Timestamp of the last intentional enabled/disabled state change. */
+  enabledUpdatedAt?: number;
   lastSwitchReason?: "rate-limit" | "initial" | "rotation";
   rateLimitResetTimes?: RateLimitStateV3;
   /**
@@ -632,6 +634,31 @@ function maxDefined(a: number | undefined, b: number | undefined): number | unde
   return Math.max(a, b);
 }
 
+function mergeEnabledState(
+  existing: AccountMetadataV3,
+  incoming: AccountMetadataV3,
+): Pick<AccountMetadataV3, "enabled" | "enabledUpdatedAt"> {
+  const existingAt = typeof existing.enabledUpdatedAt === "number" && Number.isFinite(existing.enabledUpdatedAt)
+    ? existing.enabledUpdatedAt
+    : undefined;
+  const incomingAt = typeof incoming.enabledUpdatedAt === "number" && Number.isFinite(incoming.enabledUpdatedAt)
+    ? incoming.enabledUpdatedAt
+    : undefined;
+
+  // A timestamped mutation is authoritative over a legacy/untimestamped snapshot.
+  // When both snapshots are legacy, preserve the previous incoming-writer behavior.
+  const winner = existingAt !== undefined && incomingAt !== undefined
+    ? (incomingAt >= existingAt ? incoming : existing)
+    : existingAt !== undefined
+      ? existing
+      : incoming;
+
+  return {
+    enabled: winner.enabled,
+    enabledUpdatedAt: winner === existing ? existingAt : incomingAt,
+  };
+}
+
 function mergeAccountStorage(
   existing: AccountStorageV4,
   incoming: AccountStorageV4,
@@ -655,6 +682,9 @@ function mergeAccountStorage(
         accountMap.set(acc.refreshToken, {
           ...existingAcc,
           ...acc,
+          // enabled is a user/plugin mutation, not snapshot state. Prefer the latest
+          // timestamp so a stale process cannot undo a newer CLI toggle.
+          ...mergeEnabledState(existingAcc, acc),
           // Preserve manually configured projectId/managedProjectId if not in incoming
           projectId: acc.projectId ?? existingAcc.projectId,
           managedProjectId: acc.managedProjectId ?? existingAcc.managedProjectId,
