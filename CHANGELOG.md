@@ -2,22 +2,27 @@
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-24
+
 ### Added
 
+- **OpenCode V2 support** - Added a native V2 runtime adapter for OAuth, model discovery, Google Search, events, and HTTP request hooks while retaining the explicit V1 file entrypoint.
+- **Standalone account manager** - Added the `opencode-agy` and `opencode-antigravity` commands for account setup, verification, quota inspection, account management, and model configuration.
 - **Gemini 3.8 Flash** - Added `gemini-3.8-flash` and `antigravity-gemini-3.8-flash` with `low`, `medium`, and `high` thinking variants. Antigravity requests map to the tier-specific `gemini-3.8-flash-{low,medium,high}` backend ids, use the Antigravity consumer identity required by entitlement checks, and default to `medium`. The `gemini-flash-latest` alias now resolves to Gemini 3.8 Flash.
 - **Gemini 3.7 Flash** - Added stable `gemini-3.7-flash` and `antigravity-gemini-3.7-flash` model support with thinking variants (`minimal`, `low`, `medium`, `high`).
 - **Dynamic Antigravity Registry Pulling & Caching** - Discovered Antigravity models from `POST /v1internal:fetchAvailableModels` are now automatically cataloged, cached, and registered with dynamically inferred thinking variants for newly released models. When OpenCode initializes, model discovery can automatically authenticate using configured OAuth accounts to pull the latest models from the Antigravity registry.
 
-- **Gemini 3.6 Flash and Gemini 3.5 Flash-Lite** - Added stable model support. Gemini 3.6 Flash routes to Antigravity tier-specific backends with `medium` as the default and is also available through API-key routing under its bare model ID. Gemini 3.5 Flash-Lite uses the public Gemini API directly with `minimal` as the default. The `gemini-flash-lite-latest` alias resolves to Gemini 3.5 Flash-Lite, and both models remove deprecated sampling controls before requests are sent.
-
-- **Gemini 3.5 Flash** - Added `gemini-3.5-flash` for Antigravity (`antigravity-gemini-3.5-flash`) and public API-key routing. Flash exposes `minimal`/`low`/`medium`/`high` thinking levels. Rollout-dependent.
+- **Gemini 3.6 Flash** - Added stable model support with tier-specific Antigravity backends, `medium` as the default, and API-key routing under its bare model ID.
 
 ### Fixed
 
-- **403 "Permission denied on resource project" now falls back to agy-sdk** - A 403 on a specific Antigravity backend model id (e.g. the Gemini 3.5 Flash "agent"/high-tier backend `gemini-3-flash-agent`) previously surfaced as a raw error after burning a retry against every Antigravity endpoint (daily/autopush/prod), even with full account quota and a configured agy-sdk fallback key — live testing confirmed the backend id itself is fully available with quota, so this 403 is likely transient or account/project-pairing related rather than a rollout gate. This specific 403 message is now recognized as model-unavailable (distinct from credential/verification 403s, which still surface immediately) and routes to the agy-sdk/API-key path, matching existing 404 behavior, so the request degrades gracefully instead of hard-failing regardless of root cause.
+- **Antigravity endpoint routing** - Generation and quota discovery now use only the current Daily endpoint, with bounded retries for transient failures.
+- **Gemini tier routing** - OpenCode V2 preserves explicit thinking variants, and Gemini 3.7/3.8 Low, Medium, and High resolve to their dedicated backend ids.
+- **403 model availability fallback** - A model-specific Antigravity 403 is now recognized as model-unavailable, distinct from credential or verification failures, and can route to the configured AGY SDK/API-key fallback instead of hard-failing.
 
 ### Changed
 
+- **Antigravity-only OAuth routing** - Removed legacy Gemini CLI routing, quota fallback, models, configuration, and authentication paths. The optional Gemini API-key route remains available independently.
 - **agy-sdk routing now consults the live public model catalog** - `isAgySdkSupportedRequest`/`isAntigravityOnlyGenerativeLanguageRequest` previously relied solely on a hardcoded `ANTIGRAVITY_ONLY_BARE_GEMINI_IDS` denylist to decide whether a Gemini model can be served by the public API (`generativelanguage.googleapis.com`). That list has repeatedly drifted from reality (multiple competing upstream PRs, since-reverted "speculative model" additions). The plugin now also consults the live model list already fetched for `provider.models()` discovery (`GET v1beta/models`) as an additional positive signal — present in the live catalog is treated as confirmed-routable. Absence from the catalog is never treated as a veto (the live fetch can be incomplete/credential-scoped), so this can only widen what's considered routable, never narrow it.
 
 ## [1.6.0] - 2026-02-20
