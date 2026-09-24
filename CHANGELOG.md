@@ -4,17 +4,13 @@
 
 ### Added
 
-- **Gemini 3.8 Flash** - Added `gemini-3.8-flash` and `antigravity-gemini-3.8-flash` with `low`, `medium`, and `high` thinking variants. Antigravity requests map to the tier-specific `gemini-3.8-flash-{low,medium,high}` backend ids, use the Agy CLI consumer identity required by entitlement checks, and default to `medium`. The `gemini-flash-latest` alias now resolves to Gemini 3.8 Flash.
+- **Gemini 3.8 Flash** - Added `gemini-3.8-flash` and `antigravity-gemini-3.8-flash` with `low`, `medium`, and `high` thinking variants. Antigravity requests map to the tier-specific `gemini-3.8-flash-{low,medium,high}` backend ids, use the Antigravity consumer identity required by entitlement checks, and default to `medium`. The `gemini-flash-latest` alias now resolves to Gemini 3.8 Flash.
 - **Gemini 3.7 Flash** - Added stable `gemini-3.7-flash` and `antigravity-gemini-3.7-flash` model support with thinking variants (`minimal`, `low`, `medium`, `high`).
 - **Dynamic Antigravity Registry Pulling & Caching** - Discovered Antigravity models from `POST /v1internal:fetchAvailableModels` are now automatically cataloged, cached, and registered with dynamically inferred thinking variants for newly released models. When OpenCode initializes, model discovery can automatically authenticate using configured OAuth accounts to pull the latest models from the Antigravity registry.
 
-- **Gemini 3.6 Flash and Gemini 3.5 Flash-Lite** - Added stable `gemini-3.6-flash` and `gemini-3.5-flash-lite` model support. Gemini 3.6 Flash routes to Antigravity's tier-specific backends with `medium` as the default and remains available through Gemini CLI/API-key routing under its bare model ID. Gemini 3.5 Flash-Lite uses the public Gemini path directly with `minimal` as the default. The `gemini-flash-lite-latest` alias resolves to Gemini 3.5 Flash-Lite, and both models remove deprecated sampling controls before requests are sent.
+- **Gemini 3.6 Flash and Gemini 3.5 Flash-Lite** - Added stable model support. Gemini 3.6 Flash routes to Antigravity tier-specific backends with `medium` as the default and is also available through API-key routing under its bare model ID. Gemini 3.5 Flash-Lite uses the public Gemini API directly with `minimal` as the default. The `gemini-flash-lite-latest` alias resolves to Gemini 3.5 Flash-Lite, and both models remove deprecated sampling controls before requests are sent.
 
-- **Gemini 3.5 Flash** - Added `gemini-3.5-flash` across both quota pools: Antigravity (`antigravity-gemini-3.5-flash`) and Gemini CLI (bare `gemini-3.5-flash`). Flash exposes `minimal`/`low`/`medium`/`high` thinking levels. Rollout-dependent.
-
-### Changed
-
-- **Bare Gemini CLI names for 3.1+** - Dotted-minor generations now use bare model names on the Gemini CLI backend (e.g. `gemini-3.1-pro`, `gemini-3.5-flash`) instead of the legacy `-preview` suffix, matching the `agy`/`gemini` CLIs. Renamed the `gemini-3.1-pro-preview` entry to `gemini-3.1-pro`. The 3.0 line (`gemini-3-pro-preview`, `gemini-3-flash-preview`) and the legacy `gemini-3.1-pro-preview-customtools` entry are unchanged, and previously-configured model strings still route via the resolver.
+- **Gemini 3.5 Flash** - Added `gemini-3.5-flash` for Antigravity (`antigravity-gemini-3.5-flash`) and public API-key routing. Flash exposes `minimal`/`low`/`medium`/`high` thinking levels. Rollout-dependent.
 
 ### Fixed
 
@@ -40,7 +36,6 @@
 
 - **Debug Sink Split** - `debug` now controls file logging only, while `debug_tui` independently controls TUI panel logging.
 
-- **Header Normalization** - `x-goog-user-project` is now stripped across Antigravity and Gemini CLI request styles.
 
 - **Claude Prompt Auto-Caching (Optional)** - Added `claude_prompt_auto_caching` to inject `cache_control: { type: "ephemeral" }` when Claude prompt caching is desired and unset.
 
@@ -60,11 +55,8 @@
 
 - **Header Identity Alignment** - `ideType` changed from `IDE_UNSPECIFIED` to `ANTIGRAVITY` and `platform` from `PLATFORM_UNSPECIFIED` to dynamic `WINDOWS`/`MACOS` (based on `process.platform`) across all header sources (`getAntigravityHeaders`, `oauth.ts`, `project.ts`). Now matches Antigravity Manager behavior
 
-- **Gemini CLI `Client-Metadata` Header** - Gemini CLI requests now include `Client-Metadata` header, aligning with actual `gemini-cli` behavior. Previously only Antigravity-style requests sent this header
 
-- **Gemini CLI User-Agent Format** - Updated from `GeminiCLI/{ver}/{model}` to `GeminiCLI/{ver}/{model} ({platform}; {arch})` to match real `gemini-cli` UA strings. Version pool updated from `1.2.0/1.1.0/1.0.0` to `0.28.0/0.27.4/0.27.3` to align with actual release numbers
 
-- **Randomized Headers Model-Aware** - `getRandomizedHeaders()` now accepts an optional `model` parameter, embedding the actual model name in Gemini CLI User-Agent strings instead of a hardcoded default
 
 - **Fingerprint Platform Alignment** - Antigravity-style `Client-Metadata` platform now consistently matches the randomized User-Agent platform, fixing a potential mismatch where headers could disagree on reported platform
 
@@ -94,19 +86,15 @@
 
 - **`opencode.jsonc` Support** - Configure models flow now detects and prefers existing `opencode.jsonc` files. JSONC parsing strips comments and trailing commas before JSON.parse
 
-- **Header Contract Tests** - New `src/constants.test.ts` validates header shapes, randomization behavior, and optional header fields for both Antigravity and Gemini CLI styles
 
 ### Changed
 
-- **Unified Gemini Routing** - Gemini quota fallback between Antigravity and Gemini CLI pools is now always enabled for Gemini models. The `quota_fallback` config flag is deprecated and ignored (backward-compatible, no breakage)
 
-- **`cli_first` Honored in Routing** - `resolveHeaderRoutingDecision()` centralizes routing logic and properly respects `cli_first` for unsuffixed Gemini models
 
 - **Fingerprint Headers Simplified** - `buildFingerprintHeaders()` now returns only `User-Agent`. Removed `X-Goog-QuotaUser`, `X-Client-Device-Id`, `X-Goog-Api-Client`, and `Client-Metadata` from outgoing content requests to align with Antigravity Manager behavior
 
 - **Client Metadata Reduced** - Fingerprint client metadata trimmed to `ideType`, `platform`, `pluginType` only. Removed `osVersion`, `arch`, `sqmId`
 
-- **Gemini CLI User-Agent Format** - Updated from `google-genai-sdk/...` to `GeminiCLI/...` format
 
 - **Search Model** - Changed from `gemini-2.0-flash` to `gemini-2.5-flash` for improved search result quality
 
@@ -133,8 +121,6 @@
 ### Documentation
 
 - **AGENTS.md** expanded with detailed architecture, code style, and fingerprint system documentation
-- **README.md**, **CONFIGURATION.md**, **MULTI-ACCOUNT.md** updated to reflect deprecated `quota_fallback` and automatic Gemini pool fallback behavior
-- **`antigravity.schema.json`** marks `quota_fallback` as deprecated/ignored
 
 ## [1.4.5] - 2026-02-05
 
@@ -142,13 +128,11 @@
 
 - **Configure Models Menu Action** - Auth login menu now includes a "Configure models" action that writes plugin model definitions directly into `opencode.json`, making setup easier for new users
 
-- **`cli_first` Config Option** - New configuration option to route Gemini models to Gemini CLI quota first, useful for users who want to preserve Antigravity quota for Claude models
 
 - **`toast_scope` Configuration** - Control toast visibility per session with `toast_scope: "root_only"` to suppress toasts in subagent sessions
 
 - **Soft Quota Protection** - Skip accounts over 90% usage threshold to prevent Google penalties, with configurable `soft_quota_threshold_percent` and wait/retry behavior
 
-- **Gemini CLI Quota Management** - Enhanced quota display with dual quota pool support (Antigravity + Gemini CLI)
 
 - **`OPENCODE_CONFIG_DIR` Environment Variable** - Custom config location support for non-standard setups
 
@@ -158,11 +142,9 @@
 
 ### Changed
 
-- **Model Naming and Routing** - Documented antigravity-prefixed model names and automatic mapping to CLI preview names (e.g., `antigravity-gemini-3-flash` → `gemini-3-flash-preview`)
+- **Model Naming and Routing** - Documented Antigravity-prefixed model names and automatic mapping to backend model names (e.g., `antigravity-gemini-3-flash` → `gemini-3-flash-preview`)
 
-- **Antigravity-First Quota Strategy** - Exhausts Antigravity quota across ALL accounts before falling back to Gemini CLI quota (previously per-account)
 
-- **Quota Routing Respects `cli_first`** - Fallback behavior updated to respect `cli_first` preference
 
 - **Config Directory Resolution** - Now prioritizes `OPENCODE_CONFIG_DIR` environment variable
 
@@ -173,7 +155,6 @@
 ### Fixed
 
 - **#337**: Skip disabled accounts in proactive token refresh
-- **#233**: Skip sandbox endpoints for Gemini CLI models (fixes 404/403 cascade)
 - **Windows Config Auto-Migration**: Automatically migrates config from `%APPDATA%\opencode\` to `~/.config/opencode/`
 - **Root Session Detection**: Reset `isChildSession` flag correctly for root sessions
 - **Stale Quota Cache**: Prevent spin loop on stale quota cache
@@ -181,15 +162,12 @@
 
 ### Removed
 
-- **Fingerprint Headers for Gemini CLI** - Removed fingerprint headers from Gemini CLI model requests to align with official behavior
 - **`web_search` Configuration Leftovers** - Cleaned up remaining `web_search` config remnants from schema
 
 ### Documentation
 
 - Updated README with model configuration options and simplified setup instructions
 - Updated MODEL-VARIANTS.md with Antigravity model names and configuration guidance
-- Updated CONFIGURATION.md to clarify `quota_fallback` behavior across accounts
-- Updated MULTI-ACCOUNT.md with dual quota pool and fallback flow details
 
 ---
 
@@ -270,10 +248,7 @@
   - Root cause: When Claude calls a tool with no parameters, it returns `functionCall` without an `args` field. The response transformation only processed parts where `functionCall.args` was defined, leaving `args` as `undefined`
   - Fix: Changed condition to handle all `functionCall` parts, defaulting `args` to `{}` when missing, ensuring opencode's `state.input` always receives a valid record
 
-- **Auth headers aligned with official Gemini CLI** - Updated authentication headers to match the official Antigravity/Gemini CLI behavior, reducing "account ineligible" errors and potential bans ([#178](https://github.com/NoeFabris/opencode-antigravity-auth/issues/178))
-  - `GEMINI_CLI_HEADERS["User-Agent"]`: `9.15.1` → `10.3.0`
-  - `GEMINI_CLI_HEADERS["X-Goog-Api-Client"]`: `gl-node/22.17.0` → `gl-node/22.18.0`
-  - `ANTIGRAVITY_HEADERS["User-Agent"]`: Updated to full Chrome/Electron user agent string
+- **Antigravity header alignment** - Updated `ANTIGRAVITY_HEADERS["User-Agent"]` to the full Chrome/Electron user agent string.
   - Token exchange now includes `Accept`, `Accept-Encoding`, `User-Agent`, `X-Goog-Api-Client` headers
   - Userinfo fetch now includes `User-Agent`, `X-Goog-Api-Client` headers
   - `fetchProjectID` now uses centralized constants instead of hardcoded strings

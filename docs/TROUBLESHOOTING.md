@@ -139,37 +139,6 @@ Then restart OpenCode.
 
 ---
 
-## Gemini CLI Permission Error
-
-When using Gemini CLI models, you may see:
-> Permission 'cloudaicompanion.companions.generateChat' denied on resource '//cloudaicompanion.googleapis.com/projects/...'
-
-**Why this happens:** The plugin defaults to a predefined project ID that doesn't exist in your Google Cloud account. Antigravity models work, but Gemini CLI models need your own project.
-
-**Solution:**
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create or select a project
-3. Enable the **Gemini for Google Cloud API** (`cloudaicompanion.googleapis.com`)
-4. Add `projectId` to your account in `~/.config/opencode/antigravity-accounts.json`:
-
-```json
-{
-  "version": 3,
-  "accounts": [
-    {
-      "email": "you@gmail.com",
-      "refreshToken": "...",
-      "projectId": "your-project-id"
-    }
-  ]
-}
-```
-
-> **Note:** For multi-account setups, add `projectId` to each account.
-
----
-
 ## Gemini 3 Models 400 Error ("Unknown name 'parameters'")
 
 **Error:**
