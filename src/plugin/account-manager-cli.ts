@@ -531,7 +531,9 @@ export async function runInteractiveAccountManager(
           | "verification-required"
           | "unknown" = "unknown";
 
-        if (acc.verificationRequired) {
+        if (acc.reauthRequired) {
+          status = "expired";
+        } else if (acc.verificationRequired) {
           status = "verification-required";
         } else {
           const rateLimits = acc.rateLimitResetTimes;
@@ -810,7 +812,10 @@ export async function runInteractiveAccountManager(
   while (accounts.length < MAX_OAUTH_ACCOUNTS) {
     console.log(`\n=== Antigravity OAuth (Account ${accounts.length + 1}) ===`);
 
-    const projectId = await promptProjectId();
+    const currentAccount = refreshAccountIndex !== undefined
+      ? existingStorage?.accounts[refreshAccountIndex]
+      : undefined;
+    const projectId = await promptProjectId(currentAccount?.projectId);
     const authorization = await authorizeAntigravity(projectId);
     const fallbackState = getStateFromAuthorizationUrl(authorization.url);
 
@@ -894,18 +899,21 @@ export async function runInteractiveAccountManager(
         const updatedAccounts = [...currentStorage.accounts];
         const parts = parseRefreshParts(result.refresh);
         if (parts.refreshToken) {
+          const previous = updatedAccounts[refreshAccountIndex];
           updatedAccounts[refreshAccountIndex] = {
-            ...updatedAccounts[refreshAccountIndex],
-            email: result.email ?? updatedAccounts[refreshAccountIndex]?.email,
+            ...previous,
+            email: result.email ?? previous?.email,
             refreshToken: parts.refreshToken,
-            projectId:
-              parts.projectId ?? updatedAccounts[refreshAccountIndex]?.projectId,
+            projectId: parts.projectId ?? (projectId || previous?.projectId),
             managedProjectId:
               parts.managedProjectId ??
-              updatedAccounts[refreshAccountIndex]?.managedProjectId,
+              previous?.managedProjectId,
             addedAt:
-              updatedAccounts[refreshAccountIndex]?.addedAt ?? Date.now(),
+              previous?.addedAt ?? Date.now(),
             lastUsed: Date.now(),
+            reauthRequired: false,
+            reauthRequiredAt: undefined,
+            reauthRequiredReason: undefined,
           };
           await saveAccounts({
             version: 4,

@@ -217,6 +217,10 @@ export interface AccountMetadataV3 {
   verificationRequired?: boolean;
   verificationRequiredAt?: number;
   verificationRequiredReason?: string;
+  /** Runtime-only availability marker; the account remains user-managed. */
+  reauthRequired?: boolean;
+  reauthRequiredAt?: number;
+  reauthRequiredReason?: string;
   verificationUrl?: string;
   /** Cached soft quota data */
   cachedQuota?: Record<string, { remainingFraction?: number; resetTime?: string; modelCount: number }>;
@@ -713,6 +717,39 @@ function mergeAccountStorage(
   };
 }
 
+/**
+ * Merge a runtime snapshot without allowing it to rewrite user-managed account
+ * identity or pool membership. The account manager owns those fields; request
+ * handling only owns availability, quota, rotation, and usage state.
+ */
+function mergeRuntimeAccountStorage(
+  existing: AccountStorageV4,
+  incoming: AccountStorageV4,
+): AccountStorageV4 {
+  const merged = mergeAccountStorage(existing, incoming);
+  const mergedByToken = new Map(merged.accounts.map((account) => [account.refreshToken, account]));
+
+  const accounts = existing.accounts.map((authoritative) => {
+    const operational = mergedByToken.get(authoritative.refreshToken) ?? authoritative;
+    return {
+      ...operational,
+      email: authoritative.email,
+      refreshToken: authoritative.refreshToken,
+      projectId: authoritative.projectId,
+      managedProjectId: authoritative.managedProjectId,
+      addedAt: authoritative.addedAt,
+      enabled: authoritative.enabled,
+      enabledUpdatedAt: authoritative.enabledUpdatedAt,
+    };
+  });
+
+  return {
+    ...merged,
+    accounts,
+    deletedRefreshTokenHashes: existing.deletedRefreshTokenHashes,
+  };
+}
+
 function hashRefreshToken(refreshToken: string): string {
   return createHash("sha256").update(refreshToken).digest("hex");
 }
@@ -1045,6 +1082,20 @@ export async function saveAccounts(storage: AccountStorageV4): Promise<void> {
   await withFileLock(path, async () => {
     const existing = await loadAccountsUnsafe();
     const merged = existing ? mergeAccountStorage(existing, storage) : storage;
+    await writeAccountsAtomically(path, merged);
+  });
+}
+
+/** Persist runtime-only state while preserving account-manager ownership. */
+export async function saveAccountsRuntimeState(storage: AccountStorageV4): Promise<void> {
+  const path = getStoragePath();
+  const configDir = dirname(path);
+  await fs.mkdir(configDir, { recursive: true });
+  await ensureGitignore(configDir);
+
+  await withFileLock(path, async () => {
+    const existing = await loadAccountsUnsafe();
+    const merged = existing ? mergeRuntimeAccountStorage(existing, storage) : storage;
     await writeAccountsAtomically(path, merged);
   });
 }

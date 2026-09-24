@@ -421,7 +421,7 @@ describe("createAntigravityPlugin auth.loader disk OAuth promotion", () => {
       // CRITICAL: client.auth.set must NOT have been called — doing so would
       // wipe OpenCode's api-key auth for the google provider.
       expect(authSetSpy).not.toHaveBeenCalled();
-      expect(storageModule.removeAccountFromStorage).toHaveBeenCalledWith("fake-refresh-token");
+      expect(storageModule.removeAccountFromStorage).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }

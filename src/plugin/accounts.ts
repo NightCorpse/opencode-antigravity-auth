@@ -1,5 +1,5 @@
 import { formatRefreshParts, parseRefreshParts } from "./auth";
-import { loadAccounts, removeAccountFromStorage, saveAccounts, saveAccountsReplace, type AccountStorageV4, type AccountMetadataV3, type RateLimitStateV3, type ModelFamily, type HeaderStyle, type CooldownReason } from "./storage";
+import { loadAccounts, removeAccountFromStorage, saveAccounts, saveAccountsReplace, saveAccountsRuntimeState, type AccountStorageV4, type AccountMetadataV3, type RateLimitStateV3, type ModelFamily, type HeaderStyle, type CooldownReason } from "./storage";
 import type { OAuthAuthDetails, RefreshParts } from "./types";
 import type { AccountSelectionStrategy } from "./config/schema";
 import { getHealthTracker, getTokenTracker, selectHybridAccount, type AccountWithMetrics } from "./rotation";
@@ -185,6 +185,9 @@ export interface ManagedAccount {
   verificationRequiredAt?: number;
   verificationRequiredReason?: string;
   verificationUrl?: string;
+  reauthRequired?: boolean;
+  reauthRequiredAt?: number;
+  reauthRequiredReason?: string;
 }
 
 function nowMs(): number {
@@ -503,6 +506,9 @@ export class AccountManager {
             verificationRequiredAt: acc.verificationRequiredAt,
             verificationRequiredReason: acc.verificationRequiredReason,
             verificationUrl: acc.verificationUrl,
+            reauthRequired: acc.reauthRequired,
+            reauthRequiredAt: acc.reauthRequiredAt,
+            reauthRequiredReason: acc.reauthRequiredReason,
           };
         })
         .filter((a): a is ManagedAccount => a !== null);
@@ -598,7 +604,7 @@ export class AccountManager {
     if (currentIndex >= 0 && currentIndex < this.accounts.length) {
       const account = this.accounts[currentIndex] ?? null;
       // enabled is user intent; verificationRequired is operational availability.
-      if (account && account.enabled !== false && account.verificationRequired !== true) {
+      if (account && account.enabled !== false && account.verificationRequired !== true && account.reauthRequired !== true) {
         return account;
       }
     }
@@ -648,7 +654,7 @@ export class AccountManager {
       const tokenTracker = getTokenTracker();
       
       const accountsWithMetrics: AccountWithMetrics[] = this.accounts
-        .filter(acc => acc.enabled !== false && acc.verificationRequired !== true && !excludeIndices?.has(acc.index))
+        .filter(acc => acc.enabled !== false && acc.verificationRequired !== true && acc.reauthRequired !== true && !excludeIndices?.has(acc.index))
         .map(acc => {
           clearExpiredRateLimits(acc);
           return {
@@ -718,6 +724,7 @@ export class AccountManager {
       clearExpiredRateLimits(a);
       return a.enabled !== false &&
              a.verificationRequired !== true &&
+             a.reauthRequired !== true &&
              !excludeIndices?.has(a.index) &&
              !isRateLimitedForHeaderStyle(a, family, headerStyle, model) &&
              !isOverSoftQuotaThreshold(a, family, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs, model) &&
@@ -963,6 +970,20 @@ export class AccountManager {
     return true;
   }
 
+  markReauthRequired(account: ManagedAccount, reason?: string): void {
+    account.reauthRequired = true;
+    account.reauthRequiredAt = nowMs();
+    account.reauthRequiredReason = reason?.trim() || undefined;
+    this.requestSaveToDisk();
+  }
+
+  clearReauthRequired(account: ManagedAccount): void {
+    account.reauthRequired = false;
+    account.reauthRequiredAt = undefined;
+    account.reauthRequiredReason = undefined;
+    this.requestSaveToDisk();
+  }
+
   removeAccountByIndex(accountIndex: number): boolean {
     if (accountIndex < 0 || accountIndex >= this.accounts.length) {
       return false;
@@ -1073,7 +1094,7 @@ export class AccountManager {
     const storage = this.createStorageSnapshot();
     return this.enqueueStorageOperation(() => replace
       ? saveAccountsReplace(storage)
-      : saveAccounts(storage));
+      : saveAccountsRuntimeState(storage));
   }
 
   /**
@@ -1175,6 +1196,9 @@ export class AccountManager {
         verificationRequiredAt: a.verificationRequiredAt,
         verificationRequiredReason: a.verificationRequiredReason,
         verificationUrl: a.verificationUrl,
+        reauthRequired: a.reauthRequired,
+        reauthRequiredAt: a.reauthRequiredAt,
+        reauthRequiredReason: a.reauthRequiredReason,
       })),
       activeIndex: claudeIndex,
       activeIndexByFamily: {

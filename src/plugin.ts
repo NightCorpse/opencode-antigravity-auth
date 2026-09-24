@@ -2377,26 +2377,14 @@ export const createAntigravityPlugin = (providerId: string) => async (
                 }
               } catch (error) {
                 if (error instanceof AntigravityTokenRefreshError && error.code === "invalid_grant") {
-                  // Capture the index BEFORE removal — removeAccount renumbers all
-                  // subsequent accounts, so index-keyed state must be remapped to match.
-                  const removedIndex = account.index;
-                  const removed = accountManager.removeAccount(account);
-                  if (removed) {
-                    remapAccountStateAfterRemoval(removedIndex);
-                    remapIndexSetAfterRemoval(triedSwitchIndices, removedIndex);
-                    log.warn("Removed revoked account from pool - reauthenticate via `opencode auth login`");
-                    try {
-                      await accountManager.persistAccountRemoval(account.parts.refreshToken);
-                    } catch (persistError) {
-                      log.error("Failed to persist revoked account removal", { error: String(persistError) });
-                    }
-                  }
+                  accountManager.markReauthRequired(account, "Token revoked or expired (invalid_grant)");
+                  triedSwitchIndices.add(account.index);
+                  log.warn("Marked account as requiring re-authentication - reauthenticate via `opencode-agy` or `opencode auth login`", {
+                    email: account.email,
+                    index: account.index,
+                  });
 
                   if (accountManager.getAccountCount() === 0) {
-                    // Only clear OpenCode's stored OAuth credentials when OpenCode
-                    // was actually in OAuth mode at loader time. If we promoted
-                    // OAuth from disk over an API-key auth, OpenCode's provider
-                    // state IS api-key — wiping it would corrupt that.
                     if (initialAuthWasOAuth) {
                       try {
                         await client.auth.set({
@@ -2408,13 +2396,6 @@ export const createAntigravityPlugin = (providerId: string) => async (
                       }
                     }
 
-                    // Mixed-mode safety net: when promoted-from-disk OAuth fully
-                    // fails but OpenCode has api-key auth (or env keys are configured)
-                    // and the model is routable via the public Gemini API, attempt
-                    // the api-key fallback before declaring the request unservable.
-                    // OAuth-only setups still see the helpful "invalid refresh tokens"
-                    // message since `tryAgySdkFallbackForRequest` returns null when
-                    // no api-key credentials are available.
                     const fallback = await tryAgySdkFallbackForRequest(
                       input,
                       init,
@@ -2425,7 +2406,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     if (fallback) return fallback;
 
                     throw new Error(
-                      "All Antigravity accounts have invalid refresh tokens. Run `opencode auth login` and reauthenticate.",
+                      "All Antigravity accounts have invalid refresh tokens. Run `opencode-agy` or `opencode auth login` and reauthenticate.",
                     );
                   }
 
@@ -3674,7 +3655,10 @@ export const createAntigravityPlugin = (providerId: string) => async (
             while (accounts.length < MAX_OAUTH_ACCOUNTS) {
               console.log(`\n=== Antigravity OAuth (Account ${accounts.length + 1}) ===`);
 
-              const projectId = await promptProjectId();
+              const currentAccount = refreshAccountIndex !== undefined
+                ? existingStorage?.accounts[refreshAccountIndex]
+                : undefined;
+              const projectId = await promptProjectId(currentAccount?.projectId);
 
               const result = await (async (): Promise<AntigravityTokenExchangeResult> => {
                 const authorization = await authorizeAntigravity(projectId);
@@ -3793,14 +3777,18 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     const updatedAccounts = [...currentStorage.accounts];
                     const parts = parseRefreshParts(result.refresh);
                     if (parts.refreshToken) {
+                      const previous = updatedAccounts[refreshAccountIndex];
                       updatedAccounts[refreshAccountIndex] = {
-                        ...updatedAccounts[refreshAccountIndex],
-                        email: result.email ?? updatedAccounts[refreshAccountIndex]?.email,
+                        ...previous,
+                        email: result.email ?? previous?.email,
                         refreshToken: parts.refreshToken,
-                        projectId: parts.projectId ?? updatedAccounts[refreshAccountIndex]?.projectId,
-                        managedProjectId: parts.managedProjectId ?? updatedAccounts[refreshAccountIndex]?.managedProjectId,
-                        addedAt: updatedAccounts[refreshAccountIndex]?.addedAt ?? Date.now(),
+                        projectId: parts.projectId ?? (projectId || previous?.projectId),
+                        managedProjectId: parts.managedProjectId ?? previous?.managedProjectId,
+                        addedAt: previous?.addedAt ?? Date.now(),
                         lastUsed: Date.now(),
+                        reauthRequired: false,
+                        reauthRequiredAt: undefined,
+                        reauthRequiredReason: undefined,
                       };
                       await saveAccounts({
                         version: 4,

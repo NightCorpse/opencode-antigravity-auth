@@ -12,6 +12,7 @@ vi.mock("./storage", async (importOriginal) => {
     ...original,
     saveAccounts: vi.fn().mockResolvedValue(undefined),
     saveAccountsReplace: vi.fn().mockResolvedValue(undefined),
+    saveAccountsRuntimeState: vi.fn().mockResolvedValue(undefined),
     removeAccountFromStorage: vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -1055,7 +1056,7 @@ describe("AccountManager", () => {
       if (!account) throw new Error("Revoked account not found");
 
       const inFlightSave = manager.saveToDisk();
-      await vi.waitFor(() => expect(storageModule.saveAccounts).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(storageModule.saveAccountsRuntimeState).toHaveBeenCalledOnce());
       manager.removeAccount(account);
       const removal = manager.persistAccountRemoval("revoked");
       await Promise.resolve();
@@ -1868,7 +1869,7 @@ describe("AccountManager", () => {
       // Optimistic reset clears the claude limit in memory.
       manager.clearAllRateLimitsForFamily("claude");
 
-      const saveSpy = vi.mocked(storageModule.saveAccounts);
+      const saveSpy = vi.mocked(storageModule.saveAccountsRuntimeState);
       saveSpy.mockClear();
       await manager.saveToDisk();
 
@@ -1905,7 +1906,7 @@ describe("AccountManager", () => {
         // Any read path triggers clearExpiredRateLimits.
         manager.getMinWaitTimeForFamily("claude");
 
-        const saveSpy = vi.mocked(storageModule.saveAccounts);
+        const saveSpy = vi.mocked(storageModule.saveAccountsRuntimeState);
         saveSpy.mockClear();
         await manager.saveToDisk();
 

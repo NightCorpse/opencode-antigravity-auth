@@ -5,6 +5,7 @@ import {
   loadAccounts,
   removeAccountFromStorage,
   saveAccounts,
+  saveAccountsRuntimeState,
   type AccountMetadata,
   type AccountStorage,
   type AccountStorageV4,
@@ -1342,6 +1343,58 @@ describe("saveAccounts merge — cleared rate limits are not resurrected", () =>
       // the legacy incoming reset.
       expect(merged.accounts[0]?.rateLimitResetTimes?.claude).toBe(1000);
       expect(merged.accounts[0]?.rateLimitSetTimes?.claude).toBe(200);
+    });
+
+    it("saveAccountsRuntimeState updates operational fields without overwriting administrative identity", async () => {
+      mockDisk({
+        version: 4,
+        accounts: [
+          {
+            email: "authoritative@example.com",
+            refreshToken: "r1",
+            projectId: "new-user-project",
+            managedProjectId: "new-managed-project",
+            addedAt: 100,
+            lastUsed: 100,
+            enabled: false,
+            enabledUpdatedAt: 500,
+          },
+        ],
+        activeIndex: 0,
+      });
+
+      await saveAccountsRuntimeState({
+        version: 4,
+        accounts: [
+          {
+            email: "stale@example.com",
+            refreshToken: "r1",
+            projectId: "stale-cached-project",
+            managedProjectId: "stale-managed-project",
+            addedAt: 1,
+            lastUsed: 600,
+            enabled: true,
+            enabledUpdatedAt: 1,
+            rateLimitResetTimes: { claude: 9999 },
+            rateLimitSetTimes: { claude: 600 },
+            reauthRequired: true,
+            reauthRequiredAt: 600,
+            reauthRequiredReason: "Token revoked or expired (invalid_grant)",
+          },
+        ],
+        activeIndex: 0,
+      });
+
+      const merged = readMergedSnapshot();
+      expect(merged.accounts[0]?.email).toBe("authoritative@example.com");
+      expect(merged.accounts[0]?.projectId).toBe("new-user-project");
+      expect(merged.accounts[0]?.managedProjectId).toBe("new-managed-project");
+      expect(merged.accounts[0]?.enabled).toBe(false);
+      expect(merged.accounts[0]?.enabledUpdatedAt).toBe(500);
+      expect(merged.accounts[0]?.lastUsed).toBe(600);
+      expect(merged.accounts[0]?.rateLimitResetTimes?.claude).toBe(9999);
+      expect(merged.accounts[0]?.reauthRequired).toBe(true);
+      expect(merged.accounts[0]?.reauthRequiredReason).toBe("Token revoked or expired (invalid_grant)");
     });
   });
 });

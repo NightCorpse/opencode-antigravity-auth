@@ -9,11 +9,18 @@ import {
 } from "./ui/auth-menu";
 import { updateOpencodeConfig } from "./config/updater";
 
-export async function promptProjectId(): Promise<string> {
+export async function promptProjectId(currentProjectId?: string): Promise<string> {
   const rl = createInterface({ input, output });
   try {
-    const answer = await rl.question("Project ID (leave blank to use your default project): ");
-    return answer.trim();
+    const prompt = currentProjectId
+      ? `Project ID (press Enter to keep "${currentProjectId}"): `
+      : "Project ID (leave blank to use your default project): ";
+    const answer = await rl.question(prompt);
+    const trimmed = answer.trim();
+    if (!trimmed && currentProjectId) {
+      return currentProjectId;
+    }
+    return trimmed;
   } finally {
     rl.close();
   }
