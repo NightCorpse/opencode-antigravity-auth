@@ -209,11 +209,28 @@ function modelVariants(value: unknown): Model.Variant[] {
 
   return entries.flatMap(([id, settings]) => {
     if (typeof id !== "string" || !id) return []
+    const variantSettings = settings && typeof settings === "object"
+      ? settings as Record<string, unknown>
+      : {}
+    const thinkingLevel = variantSettings.thinkingLevel
+    const thinkingConfig = variantSettings.thinkingConfig
+    const body = typeof thinkingLevel === "string"
+      ? {
+          generationConfig: {
+            thinkingConfig: { thinkingLevel },
+          },
+        }
+      : thinkingConfig && typeof thinkingConfig === "object"
+        ? {
+            generationConfig: {
+              thinkingConfig,
+            },
+          }
+        : undefined
     return [{
       id: Model.VariantID.make(id),
-      settings: settings && typeof settings === "object"
-        ? settings as Record<string, unknown>
-        : {},
+      settings: variantSettings,
+      ...(body ? { body } : {}),
     }]
   })
 }

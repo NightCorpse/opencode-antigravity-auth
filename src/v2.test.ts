@@ -97,7 +97,11 @@ describe("OpenCodeV2Plugin", () => {
     let providerModels: Array<{
       id: string
       name: string
-      variants: Array<{ id: string; settings?: Record<string, unknown> }>
+      variants: Array<{
+        id: string
+        settings?: Record<string, unknown>
+        body?: Record<string, unknown>
+      }>
     }> = []
     const removedModels: string[] = []
 
@@ -190,9 +194,21 @@ describe("OpenCodeV2Plugin", () => {
         id: "antigravity-gemini-3.8-flash",
         name: "Gemini 3.8 Flash (Antigravity)",
         variants: [
-          expect.objectContaining({ id: "low", settings: { thinkingLevel: "low" } }),
-          expect.objectContaining({ id: "medium", settings: { thinkingLevel: "medium" } }),
-          expect.objectContaining({ id: "high", settings: { thinkingLevel: "high" } }),
+          expect.objectContaining({
+            id: "low",
+            settings: { thinkingLevel: "low" },
+            body: { generationConfig: { thinkingConfig: { thinkingLevel: "low" } } },
+          }),
+          expect.objectContaining({
+            id: "medium",
+            settings: { thinkingLevel: "medium" },
+            body: { generationConfig: { thinkingConfig: { thinkingLevel: "medium" } } },
+          }),
+          expect.objectContaining({
+            id: "high",
+            settings: { thinkingLevel: "high" },
+            body: { generationConfig: { thinkingConfig: { thinkingLevel: "high" } } },
+          }),
         ],
       }),
     ]))
