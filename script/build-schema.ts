@@ -48,10 +48,6 @@ const optionDescriptions: Record<string, string> = {
   proactive_refresh_check_interval_seconds:
     "Interval between proactive refresh checks in seconds.",
   auto_update: "Enable automatic plugin updates.",
-  quota_fallback:
-    "Deprecated: accepted for backward compatibility but ignored at runtime. Gemini fallback between Antigravity and Gemini CLI is always enabled.",
-  cli_first:
-    "Prefer gemini-cli routing before Antigravity for Gemini models. When false (default), Antigravity is tried first and gemini-cli is fallback.",
   toast_scope:
     "Controls which sessions show toast notifications. 'root_only' (default) shows in root session only, 'all' shows in all sessions.",
   scheduling_mode:

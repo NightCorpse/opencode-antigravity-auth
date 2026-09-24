@@ -305,33 +305,6 @@ describe("Storage Migration", () => {
   const past = now - 100000;
 
   describe("migrateV2ToV3", () => {
-    it("converts gemini rate limits to gemini-antigravity", () => {
-      const v2: AccountStorage = {
-        version: 2,
-        accounts: [
-          {
-            refreshToken: "r1",
-            addedAt: now,
-            lastUsed: now,
-            rateLimitResetTimes: {
-              gemini: future,
-            },
-          },
-        ],
-        activeIndex: 0,
-      };
-
-      const v3 = migrateV2ToV3(v2);
-
-      expect(v3.version).toBe(3);
-      const account = v3.accounts[0];
-      if (!account) throw new Error("Account not found");
-
-      expect(account.rateLimitResetTimes).toEqual({
-        "gemini-antigravity": future,
-      });
-      expect(account.rateLimitResetTimes?.["gemini-cli"]).toBeUndefined();
-    });
 
     it("preserves claude rate limits", () => {
       const v2: AccountStorage = {

@@ -447,25 +447,7 @@ export async function displayAccountsQuota(
       return ` (resets in ${formatWaitTime(ms)})`;
     };
 
-    const hasGeminiCli =
-      res.geminiCliQuota && res.geminiCliQuota.models.length > 0;
-    console.log(`\n  ┌─ Gemini CLI Quota`);
-    if (!hasGeminiCli) {
-      const errorMsg =
-        res.geminiCliQuota?.error || "No Gemini CLI quota available";
-      console.log(`  │  └─ ${errorMsg}`);
-    } else {
-      const models = res.geminiCliQuota!.models;
-      models.forEach((model, idx) => {
-        const isLast = idx === models.length - 1;
-        const connector = isLast ? "└─" : "├─";
-        const bar = createProgressBar(model.remainingFraction);
-        const reset = formatReset(model.resetTime);
-        const modelName = model.modelId.padEnd(29);
-        console.log(`  │  ${connector} ${modelName} ${bar}${reset}`);
-      });
-    }
-
+    // Display Antigravity quota
     const hasAntigravity =
       res.quota && Object.keys(res.quota.groups).length > 0;
     console.log(`  │`);

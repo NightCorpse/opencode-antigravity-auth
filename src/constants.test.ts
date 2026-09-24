@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest"
 import {
   ANTIGRAVITY_CLI_USER_AGENT,
-  GEMINI_CLI_HEADERS,
+  ANTIGRAVITY_ENDPOINT_AUTOPUSH,
+  ANTIGRAVITY_ENDPOINT_DAILY,
+  ANTIGRAVITY_ENDPOINT_FALLBACKS,
+  ANTIGRAVITY_ENDPOINT_PROD,
   getRandomizedHeaders,
   type HeaderSet,
 } from "./constants.ts"
@@ -13,33 +16,17 @@ describe("Antigravity CLI identity", () => {
   })
 })
 
-describe("GEMINI_CLI_HEADERS", () => {
-  it("matches Code Assist headers from opencode-gemini-auth", () => {
-    expect(GEMINI_CLI_HEADERS).toEqual({
-      "User-Agent": "google-api-nodejs-client/9.15.1",
-      "X-Goog-Api-Client": "gl-node/22.17.0",
-      "Client-Metadata": "ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI",
-    })
+describe("Antigravity generation endpoints", () => {
+  it("uses sandbox endpoints without production Code Assist fallback", () => {
+    expect(ANTIGRAVITY_ENDPOINT_FALLBACKS).toEqual([
+      ANTIGRAVITY_ENDPOINT_DAILY,
+      ANTIGRAVITY_ENDPOINT_AUTOPUSH,
+    ])
+    expect(ANTIGRAVITY_ENDPOINT_FALLBACKS).not.toContain(ANTIGRAVITY_ENDPOINT_PROD)
   })
 })
 
 describe("getRandomizedHeaders", () => {
-  describe("gemini-cli style", () => {
-    it("returns static Code Assist headers", () => {
-      const headers = getRandomizedHeaders("gemini-cli", "gemini-2.5-pro")
-      expect(headers).toEqual({
-        "User-Agent": "google-api-nodejs-client/9.15.1",
-        "X-Goog-Api-Client": "gl-node/22.17.0",
-        "Client-Metadata": "ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI",
-      })
-    })
-
-    it("ignores requested model and keeps static User-Agent", () => {
-      const headers = getRandomizedHeaders("gemini-cli", "gemini-3-pro-preview")
-      expect(headers["User-Agent"]).toBe("google-api-nodejs-client/9.15.1")
-    })
-  })
-
   describe("antigravity style", () => {
     it("returns all three headers", () => {
       const headers = getRandomizedHeaders("antigravity")

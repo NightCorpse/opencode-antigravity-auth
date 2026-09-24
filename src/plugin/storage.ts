@@ -138,7 +138,6 @@ export interface RateLimitState {
 export interface RateLimitStateV3 {
   claude?: number;
   "gemini-antigravity"?: number;
-  "gemini-cli"?: number;
   [key: string]: number | undefined;
 }
 

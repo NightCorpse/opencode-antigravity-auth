@@ -131,7 +131,7 @@ export function calculateBackoffMs(
   }
 }
 
-export type BaseQuotaKey = "claude" | "gemini-antigravity" | "gemini-cli";
+export type BaseQuotaKey = "claude" | "gemini-antigravity";
 export type QuotaKey = BaseQuotaKey | `${BaseQuotaKey}:${string}`;
 
 export interface ManagedAccount {
@@ -201,7 +201,7 @@ function getQuotaKey(family: ModelFamily, headerStyle: HeaderStyle, model?: stri
   if (family === "claude") {
     return "claude";
   }
-  const base = headerStyle === "gemini-cli" ? "gemini-cli" : "gemini-antigravity";
+  const base = "gemini-antigravity";
   if (model) {
     return `${base}:${model}`;
   }
@@ -218,10 +218,7 @@ function isRateLimitedForFamily(account: ManagedAccount, family: ModelFamily, mo
     return isRateLimitedForQuotaKey(account, "claude");
   }
   
-  const antigravityIsLimited = isRateLimitedForHeaderStyle(account, family, "antigravity", model);
-  const cliIsLimited = isRateLimitedForHeaderStyle(account, family, "gemini-cli", model);
-  
-  return antigravityIsLimited && cliIsLimited;
+  return isRateLimitedForHeaderStyle(account, family, "antigravity", model);
 }
 
 function isRateLimitedForHeaderStyle(account: ManagedAccount, family: ModelFamily, headerStyle: HeaderStyle, model?: string | null): boolean {
@@ -376,7 +373,6 @@ function isOverSoftQuotaThreshold(
   cacheTtlMs: number,
   model?: string | null
 ): boolean {
-  if (headerStyle === "gemini-cli") return false;
   if (thresholdPercent >= 100) return false;
   if (!account.cachedQuota) return false;
   
@@ -812,14 +808,9 @@ export class AccountManager {
         }
       } else {
         const antigravityKey = getQuotaKey(family, "antigravity", model);
-        const cliKey = getQuotaKey(family, "gemini-cli", model);
         if (account.rateLimitResetTimes[antigravityKey] !== undefined) {
           delete account.rateLimitResetTimes[antigravityKey];
           recordClearedQuotaKey(account, antigravityKey, now);
-        }
-        if (account.rateLimitResetTimes[cliKey] !== undefined) {
-          delete account.rateLimitResetTimes[cliKey];
-          recordClearedQuotaKey(account, cliKey, now);
         }
       }
       account.consecutiveFailures = 0;
@@ -897,53 +888,7 @@ export class AccountManager {
     if (!isRateLimitedForHeaderStyle(account, family, "antigravity", model)) {
       return "antigravity";
     }
-    if (!isRateLimitedForHeaderStyle(account, family, "gemini-cli", model)) {
-      return "gemini-cli";
-    }
     return null;
-  }
-
-  /**
-   * Check if any OTHER account has antigravity quota available for the given family/model.
-   * 
-   * Used to determine whether to switch accounts vs fall back to gemini-cli:
-   * - If true: Switch to another account (preserve antigravity priority)
-   * - If false: All accounts exhausted antigravity, safe to fall back to gemini-cli
-   * 
-   * @param currentAccountIndex - Index of the current account (will be excluded from check)
-   * @param family - Model family ("gemini" or "claude")
-   * @param model - Optional model name for model-specific rate limits
-   * @returns true if any other enabled, non-cooling-down account has antigravity available
-   */
-  hasOtherAccountWithAntigravityAvailable(
-    currentAccountIndex: number,
-    family: ModelFamily,
-    model?: string | null
-  ): boolean {
-    // Claude has no gemini-cli fallback - always return false
-    // (This method is only relevant for Gemini's dual quota pools)
-    if (family === "claude") {
-      return false;
-    }
-
-    return this.accounts.some(acc => {
-      // Skip current account
-      if (acc.index === currentAccountIndex) {
-        return false;
-      }
-      // Skip disabled accounts
-      if (acc.enabled === false) {
-        return false;
-      }
-      // Skip cooling down accounts
-      if (this.isAccountCoolingDown(acc)) {
-        return false;
-      }
-      // Clear expired rate limits before checking
-      clearExpiredRateLimits(acc);
-      // Check if antigravity is available for this account
-      return !isRateLimitedForHeaderStyle(acc, family, "antigravity", model);
-    });
   }
 
   setAccountEnabled(accountIndex: number, enabled: boolean): boolean {
@@ -1110,18 +1055,9 @@ export class AccountManager {
         const t = a.rateLimitResetTimes[key];
         if (t !== undefined) waitTimes.push(Math.max(0, t - nowMs()));
       } else {
-        // For Gemini, account becomes available when EITHER pool expires for this model/family
-        const antigravityKey = getQuotaKey(family, "antigravity", model);
-        const cliKey = getQuotaKey(family, "gemini-cli", model);
-
-        const t1 = a.rateLimitResetTimes[antigravityKey];
-        const t2 = a.rateLimitResetTimes[cliKey];
-        
-        const accountWait = Math.min(
-          t1 !== undefined ? Math.max(0, t1 - nowMs()) : Infinity,
-          t2 !== undefined ? Math.max(0, t2 - nowMs()) : Infinity
-        );
-        if (accountWait !== Infinity) waitTimes.push(accountWait);
+        const key = getQuotaKey(family, "antigravity", model);
+        const t = a.rateLimitResetTimes[key];
+        if (t !== undefined) waitTimes.push(Math.max(0, t - nowMs()));
       }
     }
 

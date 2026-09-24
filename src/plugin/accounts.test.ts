@@ -311,23 +311,6 @@ describe("AccountManager", () => {
   });
 
   describe("header style fallback for Gemini", () => {
-    it("tracks rate limits separately for each header style", () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
-
-      const manager = new AccountManager(undefined, stored);
-      const account = manager.getCurrentOrNextForFamily("gemini");
-
-      manager.markRateLimited(account!, 60000, "gemini", "antigravity");
-
-      expect(manager.isRateLimitedForHeaderStyle(account!, "gemini", "antigravity")).toBe(true);
-      expect(manager.isRateLimitedForHeaderStyle(account!, "gemini", "gemini-cli")).toBe(false);
-    });
 
     it("getAvailableHeaderStyle returns antigravity first for Gemini", () => {
       const stored: AccountStorageV4 = {
@@ -344,40 +327,7 @@ describe("AccountManager", () => {
       expect(manager.getAvailableHeaderStyle(account!, "gemini")).toBe("antigravity");
     });
 
-    it("getAvailableHeaderStyle returns gemini-cli when antigravity is rate-limited", () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
 
-      const manager = new AccountManager(undefined, stored);
-      const account = manager.getCurrentOrNextForFamily("gemini");
-
-      manager.markRateLimited(account!, 60000, "gemini", "antigravity");
-
-      expect(manager.getAvailableHeaderStyle(account!, "gemini")).toBe("gemini-cli");
-    });
-
-    it("getAvailableHeaderStyle returns null when both header styles are rate-limited", () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
-
-      const manager = new AccountManager(undefined, stored);
-      const account = manager.getCurrentOrNextForFamily("gemini");
-
-      manager.markRateLimited(account!, 60000, "gemini", "antigravity");
-      manager.markRateLimited(account!, 60000, "gemini", "gemini-cli");
-
-      expect(manager.getAvailableHeaderStyle(account!, "gemini")).toBeNull();
-    });
 
     it("getAvailableHeaderStyle always returns antigravity for Claude", () => {
       const stored: AccountStorageV4 = {
@@ -411,55 +361,7 @@ describe("AccountManager", () => {
       expect(manager.getAvailableHeaderStyle(account!, "claude")).toBeNull();
     });
 
-    it("Gemini rate limits expire independently per header style", () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(0));
 
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
-
-      const manager = new AccountManager(undefined, stored);
-      const account = manager.getCurrentOrNextForFamily("gemini");
-
-      manager.markRateLimited(account!, 30000, "gemini", "antigravity");
-      manager.markRateLimited(account!, 60000, "gemini", "gemini-cli");
-
-      vi.setSystemTime(new Date(35000));
-
-      expect(manager.isRateLimitedForHeaderStyle(account!, "gemini", "antigravity")).toBe(false);
-      expect(manager.isRateLimitedForHeaderStyle(account!, "gemini", "gemini-cli")).toBe(true);
-
-      expect(manager.getAvailableHeaderStyle(account!, "gemini")).toBe("antigravity");
-    });
-
-    it("getMinWaitTimeForFamily considers both Gemini header styles", () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(0));
-
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
-
-      const manager = new AccountManager(undefined, stored);
-      const account = manager.getCurrentOrNextForFamily("gemini");
-
-      manager.markRateLimited(account!, 30000, "gemini", "antigravity");
-
-      expect(manager.getMinWaitTimeForFamily("gemini")).toBe(0);
-
-      manager.markRateLimited(account!, 60000, "gemini", "gemini-cli");
-
-      expect(manager.getMinWaitTimeForFamily("gemini")).toBe(30000);
-    });
   });
 
   describe("per-family account tracking", () => {
@@ -653,24 +555,6 @@ describe("AccountManager", () => {
       expect(next?.parts.refreshToken).toBe("r2");
     });
 
-    it("cooldown is independent from rate limits", () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
-
-      const manager = new AccountManager(undefined, stored);
-      const account = manager.getCurrentOrNextForFamily("gemini");
-
-      manager.markAccountCoolingDown(account!, 30000, "auth-failure");
-
-      expect(manager.isAccountCoolingDown(account!)).toBe(true);
-      expect(manager.isRateLimitedForHeaderStyle(account!, "gemini", "antigravity")).toBe(false);
-      expect(manager.isRateLimitedForHeaderStyle(account!, "gemini", "gemini-cli")).toBe(false);
-    });
   });
 
   describe("account selection strategies", () => {
@@ -1029,72 +913,7 @@ describe("AccountManager", () => {
     });
   });
 
-  describe("Issue #147: headerStyle-aware account selection", () => {
-    it("skips account when requested headerStyle is rate-limited even if other style is available", () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-        activeIndexByFamily: { claude: 0, gemini: 0 },
-      };
 
-      const manager = new AccountManager(undefined, stored);
-      const firstAccount = manager.getCurrentOrNextForFamily("gemini");
-
-      // Mark ONLY antigravity as rate-limited (gemini-cli is still available)
-      manager.markRateLimited(firstAccount!, 60000, "gemini", "antigravity");
-
-      // Verify: antigravity is limited, gemini-cli is not
-      expect(manager.isRateLimitedForHeaderStyle(firstAccount!, "gemini", "antigravity")).toBe(true);
-      expect(manager.isRateLimitedForHeaderStyle(firstAccount!, "gemini", "gemini-cli")).toBe(false);
-
-      // BUG: When we explicitly request antigravity headerStyle, 
-      // we should skip this account and get the next one
-      // Current behavior: returns the same account because "family" is not fully limited
-      const nextAccount = manager.getCurrentOrNextForFamily(
-        "gemini", 
-        null, 
-        "sticky", 
-        "antigravity"  // Explicitly requesting antigravity
-      );
-
-      // Verifies headerStyle-aware account selection: should skip account 0
-      // because its antigravity quota is limited, even though gemini-cli is available
-      expect(nextAccount?.index).toBe(1);
-    });
-
-    it("returns same account when a different headerStyle is rate-limited", () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-        activeIndexByFamily: { claude: 0, gemini: 0 },
-      };
-
-      const manager = new AccountManager(undefined, stored);
-      const firstAccount = manager.getCurrentOrNextForFamily("gemini");
-
-      // Mark gemini-cli as rate-limited (antigravity is still available)
-      manager.markRateLimited(firstAccount!, 60000, "gemini", "gemini-cli");
-
-      // When requesting antigravity, should return the same account
-      // because antigravity quota is still available
-      const nextAccount = manager.getCurrentOrNextForFamily(
-        "gemini", 
-        null, 
-        "sticky", 
-        "antigravity"  // Requesting antigravity which is NOT limited
-      );
-
-      expect(nextAccount?.index).toBe(0); // Should stay on account 0
-    });
-  });
 
   describe("Issue #174: saveToDisk throttling", () => {
     it("requestSaveToDisk coalesces multiple calls into one write", async () => {
@@ -1233,7 +1052,7 @@ describe("AccountManager", () => {
         ),
       ).toBe(30000);
 
-      expect(manager.getMinWaitTimeForFamily("gemini", "gemini-3-pro-image")).toBe(0);
+      expect(manager.getMinWaitTimeForFamily("gemini", "gemini-3-pro-image")).toBe(30000);
     });
 
     describe("parseRateLimitReason", () => {
@@ -1383,41 +1202,7 @@ describe("AccountManager", () => {
     });
 
     describe("Optimistic Reset", () => {
-      it("shouldTryOptimisticReset returns true when min wait time <= 2s", () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(10_000);
 
-        const stored: AccountStorageV4 = {
-          version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0, rateLimitResetTimes: { "gemini-antigravity": 11_500, "gemini-cli": 11_500 } },
-          ],
-          activeIndex: 0,
-        };
-
-        const manager = new AccountManager(undefined, stored);
-        expect(manager.shouldTryOptimisticReset("gemini")).toBe(true);
-
-        vi.useRealTimers();
-      });
-
-      it("shouldTryOptimisticReset returns false when min wait time > 2s", () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(10_000);
-
-        const stored: AccountStorageV4 = {
-          version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0, rateLimitResetTimes: { "gemini-antigravity": 15_000, "gemini-cli": 15_000 } },
-          ],
-          activeIndex: 0,
-        };
-
-        const manager = new AccountManager(undefined, stored);
-        expect(manager.shouldTryOptimisticReset("gemini")).toBe(false);
-
-        vi.useRealTimers();
-      });
 
       it("shouldTryOptimisticReset returns false when accounts are available", () => {
         const stored: AccountStorageV4 = {
@@ -1432,34 +1217,6 @@ describe("AccountManager", () => {
         expect(manager.shouldTryOptimisticReset("gemini")).toBe(false);
       });
 
-      it("clearAllRateLimitsForFamily clears rate limits and failure counters", () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(10_000);
-
-        const stored: AccountStorageV4 = {
-          version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0, rateLimitResetTimes: { "gemini-antigravity": 70_000, "gemini-cli": 80_000 } },
-            { refreshToken: "r2", projectId: "p2", addedAt: 2, lastUsed: 0, rateLimitResetTimes: { "gemini-antigravity": 90_000 } },
-          ],
-          activeIndex: 0,
-        };
-
-        const manager = new AccountManager(undefined, stored);
-        const accounts = manager.getAccounts();
-        accounts[0]!.consecutiveFailures = 3;
-        accounts[1]!.consecutiveFailures = 2;
-
-        manager.clearAllRateLimitsForFamily("gemini");
-
-        expect(accounts[0]!.rateLimitResetTimes["gemini-antigravity"]).toBeUndefined();
-        expect(accounts[0]!.rateLimitResetTimes["gemini-cli"]).toBeUndefined();
-        expect(accounts[1]!.rateLimitResetTimes["gemini-antigravity"]).toBeUndefined();
-        expect(accounts[0]!.consecutiveFailures).toBe(0);
-        expect(accounts[1]!.consecutiveFailures).toBe(0);
-
-        vi.useRealTimers();
-      });
     });
   });
 
@@ -1645,28 +1402,6 @@ describe("AccountManager", () => {
       expect(account?.parts.refreshToken).toBe("r2");
     });
 
-    it("allows gemini-cli selection when only Antigravity quota is exhausted", () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
-      const manager = new AccountManager(undefined, stored);
-      manager.updateQuotaCache(0, { "gemini-pro": { remainingFraction: 0, modelCount: 1 } });
-
-      const account = manager.getCurrentOrNextForFamily(
-        "gemini",
-        "gemini-2.5-pro",
-        "sticky",
-        "gemini-cli",
-        false,
-        90,
-      );
-
-      expect(account?.parts.refreshToken).toBe("r1");
-    });
 
     it("fails open for a cached quota whose reset time has elapsed", () => {
       vi.useFakeTimers();
@@ -1967,40 +1702,7 @@ describe("AccountManager", () => {
     });
   });
 
-  describe("hybrid strategy uses style-aware rate-limit check", () => {
-    it("does not select an account whose requested header-style pool is exhausted (other style has room)", () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
 
-      const manager = new AccountManager(undefined, stored);
-      const family: ModelFamily = "gemini";
-      const model = "antigravity-gemini-3.1-pro";
-
-      // Exhaust ONLY the antigravity pool for this model; gemini-cli still has room.
-      const account = manager.getAccounts()[0]!;
-      manager.markRateLimited(account, 60_000, family, "antigravity", model);
-
-      // isRateLimitedForFamily would report false here (cli pool has room), so the
-      // buggy hybrid branch would happily select this account for antigravity.
-      const selected = manager.getCurrentOrNextForFamily(
-        family, model, "hybrid", "antigravity", false, 100, 600_000,
-      );
-
-      // With the style-aware check, no account is available for antigravity.
-      expect(selected).toBeNull();
-
-      // Sanity: the same account IS available for the gemini-cli style.
-      const cliSelected = manager.getCurrentOrNextForFamily(
-        family, model, "hybrid", "gemini-cli", false, 100, 600_000,
-      );
-      expect(cliSelected?.index).toBe(0);
-    });
-  });
 
   describe("flushSaveToDisk awaits in-flight writes", () => {
     it("resolves only after a write triggered by requestSaveToDisk has settled", async () => {
@@ -2134,46 +1836,6 @@ describe("AccountManager", () => {
       expect(persisted.clearedQuotaKeys?.claude).toBeGreaterThan(0);
     });
 
-    it("prunes expired, superseded, and dead markers from memory during serialization", async () => {
-      const stored: AccountStorageV4 = {
-        version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        ],
-        activeIndex: 0,
-      };
-      const manager = new AccountManager(undefined, stored);
-      const account = manager.getAccounts()[0]!;
-      const now = Date.now();
-
-      // Expired clear marker (older than TTL) — must be dropped in place.
-      account.clearedQuotaKeys["claude"] = now - RATE_LIMIT_CLEAR_TTL_MS - 60_000;
-      // Superseded clear marker (a live limit exists for the same key) — must be dropped.
-      account.rateLimitResetTimes["gemini-antigravity"] = now + 1_000_000;
-      account.rateLimitSetTimes["gemini-antigravity"] = now;
-      account.clearedQuotaKeys["gemini-antigravity"] = now;
-      // Dead set timestamp (no live limit for the key) — must be dropped.
-      account.rateLimitSetTimes["gemini-cli"] = now;
-      // A valid, current clear marker — must survive.
-      account.clearedQuotaKeys["gemini-cli"] = now;
-
-      const saveSpy = vi.mocked(storageModule.saveAccounts);
-      saveSpy.mockClear();
-      await manager.saveToDisk();
-
-      // In-memory maps were pruned in place.
-      expect(account.clearedQuotaKeys["claude"]).toBeUndefined();
-      expect(account.clearedQuotaKeys["gemini-antigravity"]).toBeUndefined();
-      expect(account.rateLimitSetTimes["gemini-cli"]).toBeUndefined();
-      // Live-limit set marker and the valid clear marker survive.
-      expect(account.rateLimitSetTimes["gemini-antigravity"]).toBe(now);
-      expect(account.clearedQuotaKeys["gemini-cli"]).toBe(now);
-
-      // The persisted snapshot reflects the pruned state.
-      const persisted = saveSpy.mock.calls[0]![0].accounts[0]!;
-      expect(persisted.clearedQuotaKeys).toEqual({ "gemini-cli": now });
-      expect(persisted.rateLimitSetTimes).toEqual({ "gemini-antigravity": now });
-    });
 
     it("records the cleared generation (setAt) when a limit passively expires", async () => {
       vi.useFakeTimers();

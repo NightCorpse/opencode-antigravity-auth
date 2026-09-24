@@ -7,10 +7,6 @@
 
 import type { ResolvedModel, ThinkingTier, GoogleSearchConfig } from "./types";
 
-export interface ModelResolverOptions {
-  cli_first?: boolean;
-}
-
 /**
  * Thinking tier budgets by model family.
  * Claude and Gemini 2.5 Pro use numeric budgets.
@@ -46,8 +42,7 @@ export const MODEL_ALIASES: Record<string, string> = {
   "gemini-flash-latest": "gemini-3.8-flash",
   "gemini-flash-lite-latest": "gemini-3.5-flash-lite",
 
-  // Gemini 3 variants - for Gemini CLI only (tier stripped, thinkingLevel used)
-  // For Antigravity, these are bypassed and full model name is kept
+  // Gemini 3 variants (tier stripped, thinkingLevel used)
   "gemini-3-pro-low": "gemini-3-pro",
   "gemini-3-pro-high": "gemini-3-pro",
   "gemini-3.1-pro-low": "gemini-3.1-pro",
@@ -103,9 +98,7 @@ const GEMINI_PUBLIC_ONLY_REGEX =
   /^(?:gemini-3\.5-flash-lite(?:-(?:minimal|low|medium|high))?|gemini-flash-lite-latest)$/i;
 /**
  * Dotted-minor Gemini generations (gemini-3.1, gemini-3.5, ...) use BARE model
- * names on the Gemini CLI backend, unlike the legacy 3.0 line (gemini-3-pro) which
- * uses a "-preview" suffix. Confirmed against the antigravity (`agy`) and `gemini`
- * CLIs, which ship `gemini-3.1-pro` (no `-preview`).
+ * names in current APIs.
  */
 const GEMINI_DOTTED_MINOR_REGEX = /^gemini-3\.(?:[1-9]\d*)/i;
 
@@ -204,7 +197,7 @@ export function resolveAntigravityGemini35FlashBackendModel(
 
 /**
  * Antigravity exposes Gemini 3.6 Flash as separate tier-specific backend ids.
- * The public Gemini API and Gemini CLI continue to use the bare stable id.
+ * The public Gemini API continues to use the bare stable id.
  */
 export function resolveAntigravityGemini36FlashBackendModel(
   model: string,
@@ -225,7 +218,7 @@ export function resolveAntigravityGemini36FlashBackendModel(
 
 /**
  * Antigravity exposes Gemini 3.7 Flash as a single tiered backend id, so every
- * tier resolves to the same model. The public Gemini API and Gemini CLI continue
+ * tier resolves to the same model. The public Gemini API continues
  * to use the bare stable id.
  */
 export function resolveAntigravityGemini37FlashBackendModel(
@@ -285,11 +278,8 @@ export function isGeminiPublicOnlyModel(model: string): boolean {
  * Resolves a model name with optional tier suffix and quota prefix to its actual API model name
  * and corresponding thinking configuration.
  *
- * Quota routing:
- * - Default to Antigravity quota unless cli_first is enabled or a model is public-only
- * - Fallback to Gemini CLI happens at account rotation level when Antigravity is exhausted
- * - "antigravity-" prefix marks explicit quota (no fallback allowed)
- * - Claude and image models always use Antigravity
+ * OAuth requests always use Antigravity. The optional API-key path resolves
+ * models separately via resolveModelForHeaderStyle(..., "agy-sdk").
  *
  * Examples:
  * - "gemini-2.5-flash" → { quotaPreference: "antigravity" }
@@ -298,12 +288,10 @@ export function isGeminiPublicOnlyModel(model: string): boolean {
  * - "claude-opus-4-6-thinking-medium" → { quotaPreference: "antigravity" }
  *
  * @param requestedModel - The model name from the request
- * @param options - Optional configuration including cli_first preference
  * @returns Resolved model with thinking configuration
  */
 export function resolveModelWithTier(
   requestedModel: string,
-  options: ModelResolverOptions = {},
 ): ResolvedModel {
   const isAntigravity = QUOTA_PREFIX_REGEX.test(requestedModel);
   const modelWithoutQuota = requestedModel.replace(QUOTA_PREFIX_REGEX, "");
@@ -314,17 +302,7 @@ export function resolveModelWithTier(
     : modelWithoutQuota;
 
   const isImageModel = IMAGE_GENERATION_MODELS.test(modelWithoutQuota);
-  const isClaudeModel = modelWithoutQuota.toLowerCase().includes("claude");
-
-  // Models default to Antigravity unless they are public-only or cli_first is enabled.
-  // Fallback to gemini-cli happens at the account rotation level when Antigravity is exhausted
-  const preferGeminiCli =
-    !isAntigravity &&
-    (isGeminiPublicOnlyModel(modelWithoutQuota) ||
-      (options.cli_first === true && !isImageModel && !isClaudeModel));
-  const quotaPreference = preferGeminiCli
-    ? ("gemini-cli" as const)
-    : ("antigravity" as const);
+  const quotaPreference = "antigravity" as const;
   const explicitQuota = isAntigravity || isImageModel;
 
   const isGemini3 = modelWithoutQuota.toLowerCase().startsWith("gemini-3");
@@ -479,13 +457,7 @@ function budgetToGemini3Level(budget: number): "low" | "medium" | "high" {
 }
 
 /**
- * Resolves model name for a specific headerStyle (quota fallback support).
- * Transforms model names when switching between gemini-cli and antigravity quotas.
- *
- * Issue #103: When quota fallback occurs, model names need to be transformed:
- * - gemini-3-flash-preview (gemini-cli) → gemini-3-flash (antigravity)
- * - gemini-3-pro-preview (gemini-cli) → gemini-3-pro-low (antigravity)
- * - gemini-3-flash (antigravity) → gemini-3-flash-preview (gemini-cli)
+ * Resolves model names for Antigravity OAuth or the public Gemini API-key path.
  */
 /**
  * Maps Antigravity-only bare Gemini ids to the public Gemini API equivalent
@@ -522,7 +494,7 @@ export function mapAntigravityModelToPublicApi(
 
 export function resolveModelForHeaderStyle(
   requestedModel: string,
-  headerStyle: "antigravity" | "gemini-cli" | "agy-sdk",
+  headerStyle: "antigravity" | "agy-sdk",
 ): ResolvedModel {
   const aliasResolvedModel = MODEL_ALIASES[requestedModel];
   if (aliasResolvedModel) {
@@ -569,27 +541,6 @@ export function resolveModelForHeaderStyle(
 
     const prefixedModel = `antigravity-${transformedModel}`;
     return resolveModelWithTier(prefixedModel);
-  }
-
-  if (headerStyle === "gemini-cli") {
-    let transformedModel = requestedModel
-      .replace(/^antigravity-/i, "")
-      .replace(/-(minimal|low|medium|high)$/i, "");
-
-    // Only the legacy 3.0 line takes a "-preview" suffix on the Gemini CLI backend.
-    // Dotted-minor generations (gemini-3.1+, gemini-3.5, ...) use bare names there.
-    const hasPreviewSuffix = /-preview($|-)/i.test(transformedModel);
-    const usesBareName = GEMINI_DOTTED_MINOR_REGEX.test(transformedModel);
-    if (usesBareName && /-preview$/i.test(transformedModel)) {
-      transformedModel = transformedModel.replace(/-preview$/i, "");
-    } else if (!hasPreviewSuffix && !usesBareName) {
-      transformedModel = `${transformedModel}-preview`;
-    }
-
-    return {
-      ...resolveModelWithTier(transformedModel),
-      quotaPreference: "gemini-cli",
-    };
   }
 
   return resolveModelWithTier(requestedModel);
