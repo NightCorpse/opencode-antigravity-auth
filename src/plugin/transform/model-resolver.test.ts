@@ -84,7 +84,7 @@ describe("resolveModelWithTier", () => {
 
     it("antigravity-gemini-3.7-flash defaults to medium thinking with explicit quota", () => {
       const result = resolveModelWithTier("antigravity-gemini-3.7-flash");
-      expect(result.actualModel).toBe("gemini-3.7-flash-tiered");
+      expect(result.actualModel).toBe("gemini-3.7-flash-medium");
       expect(result.thinkingLevel).toBe("medium");
       expect(result.quotaPreference).toBe("antigravity");
       expect(result.explicitQuota).toBe(true);
@@ -218,10 +218,10 @@ describe("resolveModelWithTier", () => {
     });
 
     it.each([
-      ["antigravity-gemini-3.7-flash", "gemini-3.7-flash-tiered", "medium"],
-      ["antigravity-gemini-3.7-flash-low", "gemini-3.7-flash-tiered", "low"],
-      ["antigravity-gemini-3.7-flash-medium", "gemini-3.7-flash-tiered", "medium"],
-      ["antigravity-gemini-3.7-flash-high", "gemini-3.7-flash-tiered", "high"],
+      ["antigravity-gemini-3.7-flash", "gemini-3.7-flash-medium", "medium"],
+      ["antigravity-gemini-3.7-flash-low", "gemini-3.7-flash-low", "low"],
+      ["antigravity-gemini-3.7-flash-medium", "gemini-3.7-flash-medium", "medium"],
+      ["antigravity-gemini-3.7-flash-high", "gemini-3.7-flash-high", "high"],
     ])("resolves %s with %s thinkingLevel", (requested, actual, thinkingLevel) => {
       const result = resolveModelWithTier(requested);
       expect(result.actualModel).toBe(actual);

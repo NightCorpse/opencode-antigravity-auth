@@ -79,14 +79,11 @@ const GEMINI_36_FLASH_MODELS = {
 } as const;
 const GEMINI_37_FLASH_REGEX =
   /^gemini-3\.7-flash(?:-(low|medium|high))?$/i;
-/**
- * Unlike 3.6 Flash, Antigravity ships Gemini 3.7 Flash as a single "tiered" backend
- * id. Verified against `v1internal:fetchAvailableModels`, which lists only
- * `gemini-3.7-flash-tiered` (and references it from `tieredModelIds.flash`); the
- * tier-suffixed ids all return 404 NOT_FOUND on `v1internal:generateContent`.
- * The tier is selected through `thinkingConfig.thinkingLevel` instead.
- */
-const GEMINI_37_FLASH_MODEL = "gemini-3.7-flash-tiered";
+const GEMINI_37_FLASH_MODELS = {
+  low: "gemini-3.7-flash-low",
+  medium: "gemini-3.7-flash-medium",
+  high: "gemini-3.7-flash-high",
+} as const;
 const GEMINI_38_FLASH_REGEX =
   /^gemini-3\.8-flash(?:-(minimal|low|medium|high))?$/i;
 const GEMINI_38_FLASH_MODELS = {
@@ -217,9 +214,8 @@ export function resolveAntigravityGemini36FlashBackendModel(
 }
 
 /**
- * Antigravity exposes Gemini 3.7 Flash as a single tiered backend id, so every
- * tier resolves to the same model. The public Gemini API continues
- * to use the bare stable id.
+ * Antigravity exposes Gemini 3.7 Flash as separate tier-specific backend ids.
+ * The public Gemini API continues to use the bare stable id.
  */
 export function resolveAntigravityGemini37FlashBackendModel(
   model: string,
@@ -235,7 +231,7 @@ export function resolveAntigravityGemini37FlashBackendModel(
   if (level !== "low" && level !== "medium" && level !== "high") {
     return undefined;
   }
-  return GEMINI_37_FLASH_MODEL;
+  return GEMINI_37_FLASH_MODELS[level];
 }
 
 /** Antigravity exposes Gemini 3.8 Flash as separate tier-specific backend ids. */
