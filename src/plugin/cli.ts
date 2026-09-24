@@ -1,5 +1,6 @@
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { exec } from "node:child_process";
 import {
   showAuthMenu,
   showAccountDetails,
@@ -8,6 +9,14 @@ import {
   type AccountStatus,
 } from "./ui/auth-menu";
 import { updateOpencodeConfig } from "./config/updater";
+
+function restartOpencodeServiceSafely(): void {
+  try {
+    exec("opencode service restart", () => {});
+  } catch {
+    // Non-critical background sync
+  }
+}
 
 export async function promptProjectId(currentProjectId?: string): Promise<string> {
   const rl = createInterface({ input, output });
@@ -168,6 +177,7 @@ export async function promptLoginMode(existingAccounts: ExistingAccountInfo[]): 
       case "configure-models": {
         const result = await updateOpencodeConfig();
         if (result.success) {
+          restartOpencodeServiceSafely();
           console.log(`\n✓ Models configured in ${result.configPath}\n`);
         } else {
           console.log(`\n✗ Failed to configure models: ${result.error}\n`);

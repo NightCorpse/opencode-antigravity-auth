@@ -492,6 +492,14 @@ export async function displayAccountsQuota(
 /**
  * Runs the interactive Antigravity account manager in the terminal.
  */
+export function restartOpencodeServiceSafely(): void {
+  try {
+    exec("opencode service restart", () => {});
+  } catch {
+    // Non-critical background sync
+  }
+}
+
 export async function runInteractiveAccountManager(
   args: string[] = process.argv.slice(2),
   client: PluginClient = createDummyClient(),
@@ -504,11 +512,10 @@ export async function runInteractiveAccountManager(
     process.env.OPENCODE_HEADLESS
   );
 
-  const existingStorage = await loadAccounts();
-
   // Handle direct command-line arguments (e.g. "quota" or "-q")
   const firstArg = args[0]?.toLowerCase();
   if (firstArg === "quota" || firstArg === "-q" || firstArg === "--quota") {
+    const existingStorage = await loadAccounts();
     if (!existingStorage || existingStorage.accounts.length === 0) {
       console.log("\nNo Antigravity accounts found in storage.\n");
       return;
@@ -517,11 +524,10 @@ export async function runInteractiveAccountManager(
     return;
   }
 
-  let startFresh = true;
-  let refreshAccountIndex: number | undefined;
+  while (true) {
+    const existingStorage = await loadAccounts();
 
-  if (existingStorage && existingStorage.accounts.length > 0) {
-    while (true) {
+    if (existingStorage && existingStorage.accounts.length > 0) {
       const now = Date.now();
       const existingAccounts = existingStorage.accounts.map((acc, idx) => {
         let status:
@@ -578,6 +584,7 @@ export async function runInteractiveAccountManager(
             acc.enabled = acc.enabled === false;
             acc.enabledUpdatedAt = Date.now();
             await saveAccounts(existingStorage);
+            restartOpencodeServiceSafely();
             console.log(
               `\nAccount ${acc.email || menuResult.toggleAccountIndex + 1} ${acc.enabled ? "enabled" : "disabled"}.\n`,
             );
@@ -778,44 +785,253 @@ export async function runInteractiveAccountManager(
           existingStorage.accounts[menuResult.deleteAccountIndex];
         if (deletedAccount) {
           await removeAccountFromStorage(deletedAccount.refreshToken);
+          restartOpencodeServiceSafely();
         }
         console.log("\nAccount deleted.\n");
         await pressEnterToContinue();
         continue;
       }
 
-      if (menuResult.refreshAccountIndex !== undefined) {
-        refreshAccountIndex = menuResult.refreshAccountIndex;
-        const refreshEmail =
-          existingStorage.accounts[refreshAccountIndex]?.email;
-        console.log(`\nRe-authenticating ${refreshEmail || "account"}...\n`);
-        startFresh = false;
-        break;
-      }
-
       if (menuResult.deleteAll) {
         await clearAccounts();
+        restartOpencodeServiceSafely();
         console.log("\nAll accounts deleted.\n");
-        startFresh = true;
-        break;
+        await pressEnterToContinue();
+        continue;
       }
 
-      startFresh = menuResult.mode === "fresh";
-      break;
+      // If user chose re-authentication
+      if (menuResult.refreshAccountIndex !== undefined) {
+        const refreshIndex = menuResult.refreshAccountIndex;
+        const targetAccount = existingStorage.accounts[refreshIndex];
+        const refreshEmail = targetAccount?.email;
+        console.log(`\nRe-authenticating ${refreshEmail || "account"}...\n`);
+
+        const projectId = await promptProjectId(targetAccount?.projectId);
+        const authorization = await authorizeAntigravity(projectId);
+        const fallbackState = getStateFromAuthorizationUrl(authorization.url);
+
+        console.log("\nOAuth URL:\n" + authorization.url + "\n");
+
+        let result: AntigravityTokenExchangeResult;
+
+        if (isHeadless) {
+          result = await promptManualOAuthInput(fallbackState);
+        } else {
+          let listener: OAuthListener | null = null;
+          try {
+            listener = await startOAuthListener();
+          } catch {
+            listener = null;
+          }
+
+          await openBrowser(authorization.url);
+
+          if (listener) {
+            try {
+              const SOFT_TIMEOUT_MS = 30000;
+              const callbackPromise = listener.waitForCallback();
+              const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("SOFT_TIMEOUT")), SOFT_TIMEOUT_MS),
+              );
+
+              let callbackUrl: URL;
+              try {
+                callbackUrl = await Promise.race([callbackPromise, timeoutPromise]);
+              } catch (err) {
+                if (err instanceof Error && err.message === "SOFT_TIMEOUT") {
+                  console.log("\n⏳ Automatic callback not received after 30 seconds.");
+                  console.log("You can paste the redirect URL manually.\n");
+                  try {
+                    await listener.close();
+                  } catch {}
+                  result = await promptManualOAuthInput(fallbackState);
+                  callbackUrl = new URL("http://localhost");
+                } else {
+                  throw err;
+                }
+              }
+
+              if (result! === undefined) {
+                const params = extractOAuthCallbackParams(callbackUrl);
+                if (!params) {
+                  result = {
+                    type: "failed",
+                    error: "Missing code or state in callback URL",
+                  };
+                } else {
+                  result = await exchangeAntigravity(params.code, params.state);
+                }
+              }
+            } catch {
+              result = await promptManualOAuthInput(fallbackState);
+            } finally {
+              try {
+                await listener.close();
+              } catch {}
+            }
+          } else {
+            result = await promptManualOAuthInput(fallbackState);
+          }
+        }
+
+        if (result.type === "failed") {
+          console.log(`\n❌ Failed: ${result.error}\n`);
+          await pressEnterToContinue();
+          continue;
+        }
+
+        const currentStorage = await loadAccounts();
+        if (currentStorage) {
+          const updatedAccounts = [...currentStorage.accounts];
+          const parts = parseRefreshParts(result.refresh);
+          if (parts.refreshToken) {
+            const previous = updatedAccounts[refreshIndex];
+            updatedAccounts[refreshIndex] = {
+              ...previous,
+              email: result.email ?? previous?.email,
+              refreshToken: parts.refreshToken,
+              projectId: parts.projectId ?? (projectId || previous?.projectId),
+              managedProjectId:
+                parts.managedProjectId ??
+                previous?.managedProjectId,
+              addedAt:
+                previous?.addedAt ?? Date.now(),
+              lastUsed: Date.now(),
+              reauthRequired: false,
+              reauthRequiredAt: undefined,
+              reauthRequiredReason: undefined,
+            };
+            await saveAccounts({
+              version: 4,
+              accounts: updatedAccounts,
+              activeIndex: currentStorage.activeIndex,
+              activeIndexByFamily: currentStorage.activeIndexByFamily,
+            });
+            restartOpencodeServiceSafely();
+          }
+        }
+
+        console.log(`\n✓ Account authenticated (${result.email || "success"}).\n`);
+        await pressEnterToContinue();
+        continue;
+      }
+
+      // If user chose to add an account (or fresh setup)
+      const startFresh = menuResult.mode === "fresh";
+      let addedCount = 0;
+
+      while (true) {
+        const latestStorage = await loadAccounts();
+        const currentCount = latestStorage?.accounts.length ?? 0;
+        if (currentCount >= MAX_OAUTH_ACCOUNTS) {
+          console.log("\nMaximum number of accounts reached.\n");
+          await pressEnterToContinue();
+          break;
+        }
+
+        console.log(`\n=== Antigravity OAuth (Account ${currentCount + 1}) ===`);
+
+        const projectId = await promptProjectId();
+        const authorization = await authorizeAntigravity(projectId);
+        const fallbackState = getStateFromAuthorizationUrl(authorization.url);
+
+        console.log("\nOAuth URL:\n" + authorization.url + "\n");
+
+        let result: AntigravityTokenExchangeResult;
+
+        if (isHeadless) {
+          result = await promptManualOAuthInput(fallbackState);
+        } else {
+          let listener: OAuthListener | null = null;
+          try {
+            listener = await startOAuthListener();
+          } catch {
+            listener = null;
+          }
+
+          await openBrowser(authorization.url);
+
+          if (listener) {
+            try {
+              const SOFT_TIMEOUT_MS = 30000;
+              const callbackPromise = listener.waitForCallback();
+              const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("SOFT_TIMEOUT")), SOFT_TIMEOUT_MS),
+              );
+
+              let callbackUrl: URL;
+              try {
+                callbackUrl = await Promise.race([callbackPromise, timeoutPromise]);
+              } catch (err) {
+                if (err instanceof Error && err.message === "SOFT_TIMEOUT") {
+                  console.log("\n⏳ Automatic callback not received after 30 seconds.");
+                  console.log("You can paste the redirect URL manually.\n");
+                  try {
+                    await listener.close();
+                  } catch {}
+                  result = await promptManualOAuthInput(fallbackState);
+                  callbackUrl = new URL("http://localhost");
+                } else {
+                  throw err;
+                }
+              }
+
+              if (result! === undefined) {
+                const params = extractOAuthCallbackParams(callbackUrl);
+                if (!params) {
+                  result = {
+                    type: "failed",
+                    error: "Missing code or state in callback URL",
+                  };
+                } else {
+                  result = await exchangeAntigravity(params.code, params.state);
+                }
+              }
+            } catch {
+              result = await promptManualOAuthInput(fallbackState);
+            } finally {
+              try {
+                await listener.close();
+              } catch {}
+            }
+          } else {
+            result = await promptManualOAuthInput(fallbackState);
+          }
+        }
+
+        if (result.type === "failed") {
+          console.log(`\n❌ Failed: ${result.error}\n`);
+          await pressEnterToContinue();
+          break;
+        }
+
+        addedCount++;
+        const isFirst = addedCount === 1;
+        await persistAccountPoolHelper([result], isFirst && startFresh);
+        restartOpencodeServiceSafely();
+
+        console.log(
+          `\n✓ Account authenticated${result.email ? ` (${result.email})` : ""}`,
+        );
+
+        const updatedStorage = await loadAccounts();
+        const totalNow = updatedStorage?.accounts.length ?? 0;
+        const addAnother = await promptAddAnotherAccount(totalNow);
+        if (!addAnother) {
+          break;
+        }
+      }
+
+      await pressEnterToContinue();
+      continue;
     }
-  }
 
-  const accounts: Array<
-    Extract<AntigravityTokenExchangeResult, { type: "success" }>
-  > = [];
+    // No existing accounts - prompt to add first account
+    console.log("\nNo Antigravity accounts configured.\n");
+    console.log("=== Antigravity OAuth (Account 1) ===\n");
 
-  while (accounts.length < MAX_OAUTH_ACCOUNTS) {
-    console.log(`\n=== Antigravity OAuth (Account ${accounts.length + 1}) ===`);
-
-    const currentAccount = refreshAccountIndex !== undefined
-      ? existingStorage?.accounts[refreshAccountIndex]
-      : undefined;
-    const projectId = await promptProjectId(currentAccount?.projectId);
+    const projectId = await promptProjectId();
     const authorization = await authorizeAntigravity(projectId);
     const fallbackState = getStateFromAuthorizationUrl(authorization.url);
 
@@ -854,7 +1070,7 @@ export async function runInteractiveAccountManager(
                 await listener.close();
               } catch {}
               result = await promptManualOAuthInput(fallbackState);
-              callbackUrl = new URL("http://localhost"); // placeholder
+              callbackUrl = new URL("http://localhost");
             } else {
               throw err;
             }
@@ -888,55 +1104,13 @@ export async function runInteractiveAccountManager(
       return;
     }
 
-    accounts.push(result);
+    await persistAccountPoolHelper([result], true);
+    restartOpencodeServiceSafely();
+
     console.log(
-      `\n✓ Account authenticated${result.email ? ` (${result.email})` : ""}`,
+      `\n✓ Account authenticated${result.email ? ` (${result.email})` : ""}\n`,
     );
 
-    if (refreshAccountIndex !== undefined) {
-      const currentStorage = await loadAccounts();
-      if (currentStorage) {
-        const updatedAccounts = [...currentStorage.accounts];
-        const parts = parseRefreshParts(result.refresh);
-        if (parts.refreshToken) {
-          const previous = updatedAccounts[refreshAccountIndex];
-          updatedAccounts[refreshAccountIndex] = {
-            ...previous,
-            email: result.email ?? previous?.email,
-            refreshToken: parts.refreshToken,
-            projectId: parts.projectId ?? (projectId || previous?.projectId),
-            managedProjectId:
-              parts.managedProjectId ??
-              previous?.managedProjectId,
-            addedAt:
-              previous?.addedAt ?? Date.now(),
-            lastUsed: Date.now(),
-            reauthRequired: false,
-            reauthRequiredAt: undefined,
-            reauthRequiredReason: undefined,
-          };
-          await saveAccounts({
-            version: 4,
-            accounts: updatedAccounts,
-            activeIndex: currentStorage.activeIndex,
-            activeIndexByFamily: currentStorage.activeIndexByFamily,
-          });
-        }
-      }
-      break;
-    } else {
-      const isFirstAccount = accounts.length === 1;
-      await persistAccountPoolHelper(
-        [result],
-        isFirstAccount && startFresh,
-      );
-    }
-
-    const currentStorage = await loadAccounts();
-    const count = currentStorage?.accounts.length ?? accounts.length;
-    const addAnother = await promptAddAnotherAccount(count);
-    if (!addAnother) break;
+    await pressEnterToContinue();
   }
-
-  console.log("\n✓ Account management complete.\n");
 }
