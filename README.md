@@ -1,10 +1,6 @@
 # Antigravity OAuth Plugin for OpenCode
 
-[![npm version](https://img.shields.io/npm/v/opencode-antigravity-auth.svg)](https://www.npmjs.com/package/opencode-antigravity-auth)
-[![npm beta](https://img.shields.io/npm/v/opencode-antigravity-auth/beta.svg?label=beta)](https://www.npmjs.com/package/opencode-antigravity-auth)
-[![npm downloads](https://img.shields.io/npm/dw/opencode-antigravity-auth.svg)](https://www.npmjs.com/package/opencode-antigravity-auth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![X (Twitter)](https://img.shields.io/badge/X-@dopesalmon-000000?style=flat&logo=x)](https://x.com/dopesalmon)
 
 Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth so you can use Antigravity rate limits and access models like `gemini-3.1-pro` and `claude-opus-4-6-thinking` with your Google credentials.
 
@@ -38,79 +34,118 @@ Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth
 
 ## Installation
 
-<details open>
-<summary><b>For Humans</b></summary>
+This fork is installed directly from a local checkout.
 
-**Option A: Let an LLM do it**
+### 1. Clone and build
 
-Paste this into any LLM agent (Claude Code, OpenCode, Cursor, etc.):
-
+```bash
+git clone https://github.com/NightCorpse/opencode-antigravity-auth.git
+cd opencode-antigravity-auth
+npm install
+npm run build
+pwd
 ```
-Install the opencode-antigravity-auth plugin and add the Antigravity model definitions to ~/.config/opencode/opencode.json by following: https://raw.githubusercontent.com/NoeFabris/opencode-antigravity-auth/dev/README.md
+
+Node.js 20 or newer is required. `npm install` also attempts to create the
+`opencode-agy` and `opencode-antigravity` commands in `~/.local/bin` (or
+`$XDG_BIN_HOME`). The repository can be cloned anywhere. The final `pwd` command
+prints the value to use in place of `<REPOSITORY_PATH>` below.
+
+### 2. Load the local plugin
+
+Edit `~/.config/opencode/opencode.json` and replace `<REPOSITORY_PATH>` with the
+path printed by `pwd`.
+
+#### OpenCode V2
+
+V2 uses the plural key `plugins` and loads the repository directory:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    "<REPOSITORY_PATH>"
+  ]
+}
 ```
 
-**Option B: Manual setup**
+For example, `<REPOSITORY_PATH>` might be
+`/home/user/projects/opencode-antigravity-auth`. OpenCode V2 resolves the package
+entrypoint from that directory and loads the V2 adapter exported by
+`dist/index.js`.
 
-1. **Add the plugin** to `~/.config/opencode/opencode.json`.
+#### OpenCode V1
 
-   OpenCode 2:
+V1 uses the singular key `plugin` and points to the compiled V1 plugin file:
 
-   ```json
-   {
-     "plugins": ["opencode-antigravity-auth@latest"]
-   }
-   ```
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "file://<REPOSITORY_PATH>/dist/src/plugin.js"
+  ]
+}
+```
 
-   OpenCode 1 remains supported through the package's named V1 exports:
+| OpenCode version | Configuration key | Local target |
+|------------------|-------------------|--------------|
+| V1 | `plugin` | `dist/src/plugin.js` file |
+| V2 | `plugins` | repository directory |
 
-   ```json
-   {
-     "plugin": ["opencode-antigravity-auth@latest"]
-   }
-   ```
+Do not point V1 at the repository directory: its default package export is the
+V2 adapter. After pulling changes, run `npm install` when dependencies changed,
+then `npm run build`, and restart OpenCode.
 
-   > Want bleeding-edge features? Use `opencode-antigravity-auth@beta` instead.
+Because this installation is managed with Git rather than a package registry,
+disable package update checks in `~/.config/opencode/antigravity.json`:
 
-2. **Login** with your Google account:
+```json
+{
+  "auto_update": false
+}
+```
 
-   ```bash
-   opencode auth login
-   ```
+### 3. Authenticate
 
-3. **Models** — current OpenCode versions can load plugin models dynamically at runtime. If your OpenCode version still requires static provider config, choose one:
-   - Run `opencode auth login` → Google → OAuth with Google (Antigravity) → select **"Configure models in opencode.json"** (auto-configures all models)
-   - Or manually copy the [full configuration](#models) below
+```bash
+opencode auth login
+```
 
-4. **Use it:**
+Current OpenCode versions load plugin models dynamically. If your version still
+requires static provider configuration, run `opencode-agy` and select
+**Configure models in opencode.json**, or copy the [full configuration](#models).
 
-   ```bash
-   opencode run "Hello" --model=google/antigravity-claude-opus-4-6-thinking --variant=max
-   ```
-
-</details>
-
-<details>
-<summary><b>For LLM Agents</b></summary>
-
-### Step-by-Step Instructions
-
-1. Edit the OpenCode configuration file at `~/.config/opencode/opencode.json`
-   
-   > **Note**: This path works on all platforms. On Windows, `~` resolves to your user home directory (e.g., `C:\Users\YourName`).
-
-2. Add the plugin to the `plugin` array
-
-3. Add the model definitions from the [Full models configuration](#models) section
-
-4. Set `provider` to `"google"` and choose a model
-
-### Verification
+### 4. Verify
 
 ```bash
 opencode run "Hello" --model=google/antigravity-claude-opus-4-6-thinking --variant=max
 ```
 
-</details>
+### Local account manager
+
+`opencode-agy` and `opencode-antigravity` are aliases for the same interactive
+account manager:
+
+```bash
+opencode-agy
+# or
+opencode-antigravity
+```
+
+Use it to:
+
+- add, remove, refresh, enable, or disable OAuth accounts;
+- verify one account or all configured accounts;
+- view the available quota and reset time for each account;
+- clear the stored accounts and authenticate again;
+- write the current model definitions to `opencode.json`.
+
+If the commands are not found, ensure the user binary directory is on `PATH`:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+npm run link-bin
+```
 
 ---
 
@@ -158,7 +193,9 @@ Add this to your `~/.config/opencode/opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-antigravity-auth@latest"],
+  "plugin": [
+    "file://<REPOSITORY_PATH>/dist/src/plugin.js"
+  ],
   "provider": {
     "google": {
       "models": {
@@ -342,9 +379,12 @@ Invalid JSON payload received. Unknown name "parameters" at 'request.tools[0]'
 - Plugin version regression
 
 **Solutions:**
-1. **Update to latest beta:**
-   ```json
-   { "plugin": ["opencode-antigravity-auth@beta"] }
+1. **Update and rebuild the local checkout:**
+   ```bash
+   cd "<REPOSITORY_PATH>"
+   git pull --ff-only
+   npm install
+   npm run build
    ```
 
 2. **Disable MCP servers** one-by-one to find the problematic one
@@ -375,16 +415,16 @@ This usually means an MCP tool name starts with a number (for example, a 1mcp ke
 **Diagnosis:**
 1. Disable all MCP servers in your config
 2. Enable one-by-one until error reappears
-3. Report the specific MCP in a [GitHub issue](https://github.com/NoeFabris/opencode-antigravity-auth/issues)
+3. Report the specific MCP in a [GitHub issue](https://github.com/NightCorpse/opencode-antigravity-auth/issues)
 
 ---
 
 ### "All Accounts Rate-Limited" (But Quota Available)
 
-**Cause:** Cascade bug in `clearExpiredRateLimits()` in hybrid mode (fixed in recent beta).
+**Cause:** Cascade bug in `clearExpiredRateLimits()` in hybrid mode (fixed in recent versions).
 
 **Solutions:**
-1. Update to latest beta version
+1. Update and rebuild the local checkout as described above
 2. If persists, delete accounts file and re-authenticate
 3. Try switching `account_selection_strategy` to `"sticky"` in `antigravity.json`
 
@@ -499,22 +539,16 @@ ssh -L 51121:localhost:51121 user@remote
 
 ### Plugin Configuration Key
 
-OpenCode 2 uses `plugins` (plural):
-
-```json
-{
-  "plugins": ["opencode-antigravity-auth@beta"]
-}
-```
-
-OpenCode 1 uses the legacy `plugin` (singular) key instead.
+OpenCode V2 uses `plugins` (plural) with the local repository directory.
+OpenCode V1 uses `plugin` (singular) with the compiled `dist/src/plugin.js` file.
+See [Load the local plugin](#2-load-the-local-plugin) for complete examples.
 
 ---
 
 ### Migrating Accounts Between Machines
 
 When copying `antigravity-accounts.json` to a new machine:
-1. Ensure the plugin is installed: `"plugins": ["opencode-antigravity-auth@beta"]` (OpenCode 2) or `"plugin": ["opencode-antigravity-auth@beta"]` (OpenCode 1)
+1. Ensure the local checkout is built and configured using the correct V1 or V2 path described above
 2. Copy `~/.config/opencode/antigravity-accounts.json`
 3. If you get "API key missing" error, the refresh token may be invalid — re-authenticate
 
@@ -531,9 +565,9 @@ DCP creates synthetic assistant messages that lack thinking blocks. **List this 
 
 ```json
 {
-  "plugin": [
-    "opencode-antigravity-auth@latest",
-    "@tarquinen/opencode-dcp@latest"
+  "plugins": [
+    "<REPOSITORY_PATH>",
+    "@tarquinen/opencode-dcp"
   ]
 }
 ```
@@ -567,7 +601,7 @@ Create `~/.config/opencode/antigravity.json` for optional settings:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/NoeFabris/opencode-antigravity-auth/main/assets/antigravity.schema.json"
+  "$schema": "https://raw.githubusercontent.com/NightCorpse/opencode-antigravity-auth/main/assets/antigravity.schema.json"
 }
 ```
 
@@ -652,7 +686,7 @@ Control how the plugin handles rate limits:
 | `quiet_mode` | `false` | Hide toast notifications |
 | `debug` | `false` | Enable debug file logging (`~/.config/opencode/antigravity-logs/`) |
 | `debug_tui` | `false` | Show debug logs in the TUI log panel (independent from `debug`) |
-| `auto_update` | `true` | Auto-update plugin |
+| `auto_update` | `true` | Package update checker; set to `false` for this local Git installation |
 
 For all options, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
