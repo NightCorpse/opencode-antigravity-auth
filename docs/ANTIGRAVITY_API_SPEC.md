@@ -23,9 +23,7 @@ Antigravity is Google's **Unified Gateway API** for accessing multiple AI models
 
 | Environment | URL | Status |
 |-------------|-----|--------|
-| **Daily (Sandbox)** | `https://daily-cloudcode-pa.sandbox.googleapis.com` | ✅ Active |
-| **Production** | `https://cloudcode-pa.googleapis.com` | ✅ Active |
-| **Autopush (Sandbox)** | `https://autopush-cloudcode-pa.sandbox.googleapis.com` | ❌ Unavailable |
+| **Daily** | `https://daily-cloudcode-pa.googleapis.com` | ✅ Primary |
 
 ### API Actions
 
@@ -619,7 +617,7 @@ The following Anthropic/Vertex AI features are **NOT supported**:
 
 | Feature | Antigravity | Vertex AI Anthropic |
 |---------|-------------|---------------------|
-| Endpoint | `cloudcode-pa.googleapis.com` | `aiplatform.googleapis.com` |
+| Endpoint | `daily-cloudcode-pa.googleapis.com` | `aiplatform.googleapis.com` |
 | Request format | Gemini-style `contents` | Anthropic `messages` |
 | `anthropic_version` | Not used | Required |
 | Model names | Simple (`claude-sonnet-4-6`) | Versioned (`claude-4-5@date`) |

@@ -25,35 +25,25 @@ export const ANTIGRAVITY_SCOPES: readonly string[] = [
 export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:51121/oauth-callback";
 
 /**
- * Root endpoints for the Antigravity API (in fallback order).
- * CLIProxy and Vibeproxy use the daily sandbox endpoint first,
- * then fall back to autopush if needed.
+ * Root endpoint for the Antigravity API.
+ * Transient failures are retried against this endpoint before account rotation.
  */
-export const ANTIGRAVITY_ENDPOINT_DAILY = "https://daily-cloudcode-pa.sandbox.googleapis.com";
-export const ANTIGRAVITY_ENDPOINT_AUTOPUSH = "https://autopush-cloudcode-pa.sandbox.googleapis.com";
-export const ANTIGRAVITY_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
+export const ANTIGRAVITY_ENDPOINT_DAILY = "https://daily-cloudcode-pa.googleapis.com";
 
 /**
- * Generation endpoint fallback order (daily → autopush).
- * The production Code Assist endpoint is intentionally not used for generation.
+ * Generation endpoint list. Kept as an array for the bounded retry loop.
  */
 export const ANTIGRAVITY_ENDPOINT_FALLBACKS = [
   ANTIGRAVITY_ENDPOINT_DAILY,
-  ANTIGRAVITY_ENDPOINT_AUTOPUSH,
 ] as const;
 
 /**
- * Preferred endpoint order for project discovery (prod first, then fallbacks).
- * loadCodeAssist appears to be best supported on prod for managed project resolution.
+ * Project discovery uses the same Antigravity-only endpoint.
  */
-export const ANTIGRAVITY_LOAD_ENDPOINTS = [
-  ANTIGRAVITY_ENDPOINT_PROD,
-  ANTIGRAVITY_ENDPOINT_DAILY,
-  ANTIGRAVITY_ENDPOINT_AUTOPUSH,
-] as const;
+export const ANTIGRAVITY_LOAD_ENDPOINTS = ANTIGRAVITY_ENDPOINT_FALLBACKS;
 
 /**
- * Primary endpoint to use (daily sandbox - same as CLIProxy/Vibeproxy).
+ * Primary endpoint used by the current first-party Antigravity CLI.
  */
 export const ANTIGRAVITY_ENDPOINT = ANTIGRAVITY_ENDPOINT_DAILY;
 

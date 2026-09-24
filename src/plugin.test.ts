@@ -517,11 +517,7 @@ describe("createAntigravityPlugin auth.loader 404→agy-sdk fallback", () => {
       const url = typeof input === "string" ? input : (input as Request).url;
 
       // Antigravity backend endpoints → return the configured status (default 404).
-      if (
-        url.includes("cloudcode-pa.googleapis.com") ||
-        url.includes("daily-cloudcode-pa") ||
-        url.includes("autopush-cloudcode-pa")
-      ) {
+      if (url.includes("daily-cloudcode-pa")) {
         const backendBody = backendStatus === 403
           ? { error: { code: 403, message: backendMessage ?? "Permission denied.", status: "PERMISSION_DENIED" } }
           : { error: { code: 404, message: "Requested entity was not found.", status: "NOT_FOUND" } };

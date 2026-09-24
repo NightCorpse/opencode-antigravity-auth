@@ -579,7 +579,7 @@ describe("request.ts", () => {
       );
 
       const headers = result.init.headers as Headers;
-      expect(result.request).toBe("https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:generateContent");
+      expect(result.request).toBe("https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent");
       expect(headers.get("Authorization")).toBe("Bearer test-token");
       expect(headers.get("x-goog-api-key")).toBeNull();
       expect(result.init.method).toBe("POST");
@@ -1382,7 +1382,7 @@ describe("request.ts", () => {
         undefined,
         "gemini-2.5-pro",
         "test-project",
-        "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:generateContent",
+        "https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent",
         "gemini-2.5-pro",
         "session-1",
         0,
@@ -1390,7 +1390,7 @@ describe("request.ts", () => {
         undefined,
         [
           "status=500 INTERNAL",
-          "endpoint=https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:generateContent",
+          "endpoint=https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent",
           "account=test@example.com",
         ],
       );
@@ -1398,7 +1398,7 @@ describe("request.ts", () => {
       const bodyText = await transformed.text();
       expect(bodyText).toContain("[ThinkingResolution]");
       expect(bodyText).toContain("status=500 INTERNAL");
-      expect(bodyText).toContain("endpoint=https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:generateContent");
+      expect(bodyText).toContain("endpoint=https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent");
       expect(bodyText).toContain("account=test@example.com");
 
       initializeDebug(DEFAULT_CONFIG);
@@ -1425,7 +1425,7 @@ describe("request.ts", () => {
         undefined,
         "antigravity-claude-opus-4-6-thinking",
         "test-project",
-        "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+        "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
         "claude-opus-4-6-thinking",
         "session-1",
         0,
@@ -1457,7 +1457,7 @@ describe("request.ts", () => {
           undefined,
           "antigravity-claude-opus-4-6-thinking",
           "test-project",
-          "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+          "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
           "claude-opus-4-6-thinking",
           "session-1",
         ),

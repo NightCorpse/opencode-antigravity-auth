@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 const CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
 const CLIENT_SECRET = "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";
-const CLOUD_CODE_BASE = "https://cloudcode-pa.googleapis.com";
+const CLOUD_CODE_BASE = "https://daily-cloudcode-pa.googleapis.com";
 const USER_AGENT = "antigravity/windows/amd64";
 const FALLBACK_PROJECT_ID = "bamboo-precept-lgxtn";
 

@@ -1,5 +1,5 @@
 import {
-  ANTIGRAVITY_ENDPOINT_PROD,
+  ANTIGRAVITY_ENDPOINT_DAILY,
   getAntigravityHeaders,
   ANTIGRAVITY_PROVIDER_ID,
 } from "../constants";
@@ -185,7 +185,7 @@ export async function fetchAvailableModels(
   accessToken: string,
   projectId: string,
 ): Promise<FetchAvailableModelsResponse> {
-  const endpoint = ANTIGRAVITY_ENDPOINT_PROD;
+  const endpoint = ANTIGRAVITY_ENDPOINT_DAILY;
   const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64";
   const errors: string[] = [];
 

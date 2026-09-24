@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest"
 import {
   ANTIGRAVITY_CLI_USER_AGENT,
-  ANTIGRAVITY_ENDPOINT_AUTOPUSH,
   ANTIGRAVITY_ENDPOINT_DAILY,
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
-  ANTIGRAVITY_ENDPOINT_PROD,
   getRandomizedHeaders,
   type HeaderSet,
 } from "./constants.ts"
@@ -17,12 +15,11 @@ describe("Antigravity CLI identity", () => {
 })
 
 describe("Antigravity generation endpoints", () => {
-  it("uses sandbox endpoints without production Code Assist fallback", () => {
+  it("uses only the current Daily endpoint", () => {
     expect(ANTIGRAVITY_ENDPOINT_FALLBACKS).toEqual([
       ANTIGRAVITY_ENDPOINT_DAILY,
-      ANTIGRAVITY_ENDPOINT_AUTOPUSH,
     ])
-    expect(ANTIGRAVITY_ENDPOINT_FALLBACKS).not.toContain(ANTIGRAVITY_ENDPOINT_PROD)
+    expect(ANTIGRAVITY_ENDPOINT_DAILY).toBe("https://daily-cloudcode-pa.googleapis.com")
   })
 })
 
