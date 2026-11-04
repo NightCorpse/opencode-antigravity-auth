@@ -2,8 +2,11 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-04
+
 ### Added
 
+- Gemini 4 Argon with low/medium/high thinking variants, tier-specific OAuth backend IDs, and CLI 1.4.0 identity.
 - Claude Opus/Sonnet 5.5 with OpenCode low/medium/high variants and GPT-OSS 120B Medium in the curated catalog. Claude variants select tier-specific backend IDs (medium by default); GPT keeps its Medium backend ID. Claude 4.6 and GPT-OSS are advertised for removal on November 18, 2026.
 
 ### Changed
