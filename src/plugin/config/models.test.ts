@@ -20,15 +20,26 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
 
     expect(modelNames).toEqual([
       "antigravity-claude-opus-4-6-thinking",
+      "antigravity-claude-opus-5-5-high",
+      "antigravity-claude-opus-5-5-low",
+      "antigravity-claude-opus-5-5-medium",
       "antigravity-claude-sonnet-4-6",
+      "antigravity-claude-sonnet-5-5-high",
+      "antigravity-claude-sonnet-5-5-low",
+      "antigravity-claude-sonnet-5-5-medium",
+      "antigravity-gemini-2.5-pro",
       "antigravity-gemini-3-flash",
       "antigravity-gemini-3-pro",
+      "antigravity-gemini-3.1-flash-image",
+      "antigravity-gemini-3.1-flash-lite",
       "antigravity-gemini-3.1-pro",
       "antigravity-gemini-3.5-flash",
+      "antigravity-gemini-3.5-flash-lite",
       "antigravity-gemini-3.6-flash",
       "antigravity-gemini-3.7-flash",
       "antigravity-gemini-3.8-flash",
       "antigravity-gemini-4-argon",
+      "antigravity-gpt-oss-120b-medium",
     ]);
   });
 

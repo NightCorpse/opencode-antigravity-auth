@@ -153,6 +153,41 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
       max: { thinkingConfig: { thinkingBudget: 32768 } },
     },
   },
+  ...Object.fromEntries(["opus", "sonnet"].flatMap((family) =>
+    ["low", "medium", "high"].map((tier) => [
+      `antigravity-claude-${family}-5-5-${tier}`,
+      {
+        name: `Claude ${family === "opus" ? "Opus" : "Sonnet"} 5.5 (${tier.charAt(0).toUpperCase() + tier.slice(1)}) (Antigravity)`,
+        limit: { context: 1000000, output: 128000 },
+        modalities: { input: ["text", "image"], output: ["text"] },
+      } satisfies OpencodeModelDefinition,
+    ]))),
+  "antigravity-gpt-oss-120b-medium": {
+    name: "GPT-OSS 120B (Medium) (Antigravity)",
+    limit: { context: 131072, output: 32768 },
+    modalities: { input: ["text"], output: ["text"] },
+  },
+  "antigravity-gemini-2.5-pro": {
+    name: "Gemini 2.5 Pro (Antigravity)",
+    limit: { context: 1048576, output: 65535 },
+    modalities: DEFAULT_MODALITIES,
+  },
+  "antigravity-gemini-3.1-flash-lite": {
+    name: "Gemini 3.1 Flash Lite (Antigravity)",
+    limit: { context: 1048576, output: 65535 },
+    modalities: DEFAULT_MODALITIES,
+  },
+  "antigravity-gemini-3.5-flash-lite": {
+    name: "Gemini 3.5 Flash Lite (Antigravity)",
+    temperature: false,
+    limit: { context: 1048576, output: 65535 },
+    modalities: DEFAULT_MODALITIES,
+  },
+  "antigravity-gemini-3.1-flash-image": {
+    name: "Gemini 3.1 Flash Image (Antigravity)",
+    limit: { context: 65536, output: 65536 },
+    modalities: { input: ["text", "image"], output: ["text", "image"] },
+  },
 };
 
 function modelIdFromGeminiName(name: string | undefined): string | null {

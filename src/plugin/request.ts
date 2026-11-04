@@ -2329,7 +2329,7 @@ export function prepareAntigravityRequest(
 
     headers.set(
       "User-Agent",
-      isGemini4ArgonModel(effectiveModel)
+      (isGemini4ArgonModel(effectiveModel) || /^claude-(?:opus|sonnet)-5-5-(?:low|medium|high)$/i.test(effectiveModel))
         ? ANTIGRAVITY_ARGON_CLI_USER_AGENT
         : /^gemini-3\.8-flash-(?:low|medium|high)$/i.test(effectiveModel)
         ? ANTIGRAVITY_CLI_USER_AGENT

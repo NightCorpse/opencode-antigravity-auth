@@ -20,7 +20,7 @@ const PUBLIC_MODEL_IDS = new Set(
 )
 function isUnavailableModel(id: string): boolean {
   return id === "antigravity-gemini-3-pro"
-    || id.startsWith("antigravity-gemini-3.5-flash")
+     || /^antigravity-gemini-3\.5-flash(?:-(?:minimal|low|medium|high|tiered))?$/.test(id)
 }
 
 function isPublicModel(id: string): boolean {

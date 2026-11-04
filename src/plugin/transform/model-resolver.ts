@@ -318,6 +318,17 @@ export function resolveModelWithTier(
   const quotaPreference = "antigravity" as const;
   const explicitQuota = isAntigravity || isImageModel;
 
+  // These suffixes identify real backend IDs, not legacy numeric-budget
+  // variants. Preserve them verbatim and let the backend select reasoning.
+  if (/^(?:claude-(?:opus|sonnet)-5-5-(?:low|medium|high)|gpt-oss-120b-medium)$/i.test(modelWithoutQuota)) {
+    return { actualModel: modelWithoutQuota.toLowerCase(), isThinkingModel: true, quotaPreference, explicitQuota };
+  }
+
+  // Flash Lite is a distinct backend, not the tiered 3.5 Flash family.
+  if (/^gemini-3\.[15]-flash-lite$/i.test(modelWithoutQuota)) {
+    return { actualModel: modelWithoutQuota.toLowerCase(), thinkingLevel: getDefaultGemini3ThinkingLevel(modelWithoutQuota), isThinkingModel: true, quotaPreference, explicitQuota };
+  }
+
   if (isGemini4ArgonModel(modelWithoutQuota)) {
     const argonTier = modelWithoutQuota.toLowerCase().match(TIER_REGEX)?.[1];
     const thinkingLevel = argonTier ?? "medium";

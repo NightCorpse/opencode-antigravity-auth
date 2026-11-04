@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Claude Opus/Sonnet 5.5 low/medium/high backend IDs, GPT-OSS 120B Medium, Gemini 2.5 Pro, Gemini 3.1/3.5 Flash Lite, and Gemini 3.1 Flash Image in the curated catalog. Claude 5.5 and GPT suffixes are preserved as backend IDs rather than stripped as legacy budget variants. GPT-OSS is advertised for removal on November 18, 2026.
+
 ### Changed
 
 - Account selection and rotation consult fresh per-account catalogs, including the lowered backend tier. Missing/disabled models are excluded only for accounts with successful fresh discovery; unknown discovery remains retryable. Model visibility is not restricted by account entitlements.

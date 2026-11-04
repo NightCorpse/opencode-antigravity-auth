@@ -167,6 +167,13 @@ npm run link-bin
 | `antigravity-gemini-4-argon` | low, medium, high | Gemini 4 Argon with thinking (medium default; account-dependent availability) |
 | `antigravity-claude-sonnet-4-6` | — | Claude Sonnet 4.6 |
 | `antigravity-claude-opus-4-6-thinking` | low, max | Claude Opus 4.6 with extended thinking |
+| `antigravity-claude-opus-5-5-{low,medium,high}` | Separate model IDs | Claude Opus 5.5; 1M context, 128k output; account-dependent |
+| `antigravity-claude-sonnet-5-5-{low,medium,high}` | Separate model IDs | Claude Sonnet 5.5; 1M context, 128k output; account-dependent |
+| `antigravity-gpt-oss-120b-medium` | — | GPT-OSS 120B; 131,072 context, 32,768 output; server announces removal on November 18, 2026 |
+| `antigravity-gemini-2.5-pro` | — | Gemini 2.5 Pro |
+| `antigravity-gemini-3.1-flash-lite` | — | Gemini 3.1 Flash Lite |
+| `antigravity-gemini-3.5-flash-lite` | — | Gemini 3.5 Flash Lite |
+| `antigravity-gemini-3.1-flash-image` | — | Gemini 3.1 Flash Image |
 
 Argon OAuth requests use the tier-specific Antigravity backend IDs (`gemini-4-argon-low`, `-medium`, `-high`) and CLI 1.4.0 identity. The public Gemini API uses the bare `gemini-4-argon` ID instead.
 
