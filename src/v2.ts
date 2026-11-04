@@ -3,7 +3,7 @@ import { Credential, Model, Plugin, Provider } from "@opencode/plugin"
 import { ANTIGRAVITY_PROVIDER_ID } from "./constants"
 import { createAntigravityPlugin } from "./plugin"
 import type { AntigravityTokenExchangeResult } from "./antigravity/oauth"
-import { OPENCODE_MODEL_DEFINITIONS } from "./plugin/config/models"
+import { OPENCODE_ACTIVE_MODEL_DEFINITIONS } from "./plugin/config/models"
 import type {
   AuthMethod,
   AuthDetails,
@@ -16,11 +16,10 @@ import type {
 const PLUGIN_ID = "opencode-antigravity-auth"
 const OAUTH_METHOD_ID = "antigravity"
 const PUBLIC_MODEL_IDS = new Set(
-  Object.keys(OPENCODE_MODEL_DEFINITIONS).filter((id) => id.startsWith("antigravity-")),
+  Object.keys(OPENCODE_ACTIVE_MODEL_DEFINITIONS).filter((id) => id.startsWith("antigravity-")),
 )
 function isUnavailableModel(id: string): boolean {
-  return id === "antigravity-gemini-3-pro"
-     || /^antigravity-gemini-3\.5-flash(?:-(?:minimal|low|medium|high|tiered))?$/.test(id)
+  return id.startsWith("antigravity-") && !PUBLIC_MODEL_IDS.has(id)
 }
 
 function isPublicModel(id: string): boolean {

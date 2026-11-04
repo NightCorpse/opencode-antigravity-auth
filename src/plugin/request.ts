@@ -60,7 +60,7 @@ import {
 } from "./thinking-recovery";
 import { sanitizeCrossModelPayloadInPlace } from "./transform/cross-model-sanitizer";
 import { isGemini4ArgonModel } from "./transform/gemini";
-import { resolveAntigravityGemini4ArgonBackendModel } from "./transform/model-resolver";
+import { isClaude55Model, resolveClaude55BackendModel, resolveAntigravityGemini4ArgonBackendModel } from "./transform/model-resolver";
 import {
   isGemini3Model,
   isImageGenerationModel,
@@ -1330,7 +1330,7 @@ export function prepareAntigravityRequest(
           }
         }
 
-        if (isGemini3Model(effectiveModel) || isGemini4ArgonModel(effectiveModel)) {
+        if (isGemini3Model(effectiveModel) || isGemini4ArgonModel(effectiveModel) || isClaude55Model(effectiveModel)) {
           for (const req of requestObjects) {
             const variantConfig = extractVariantThinkingConfig(
               (req as any).providerOptions as
@@ -1359,6 +1359,11 @@ export function prepareAntigravityRequest(
         }
 
         if (headerStyle === "antigravity") {
+          const claude55Backend = resolveClaude55BackendModel(effectiveModel, tierThinkingLevel);
+          if (claude55Backend) {
+            effectiveModel = claude55Backend;
+            wrappedBody.model = claude55Backend;
+          }
           const argonBackendModel = resolveAntigravityGemini4ArgonBackendModel(effectiveModel, tierThinkingLevel);
           if (argonBackendModel) {
             effectiveModel = argonBackendModel;
@@ -1426,6 +1431,9 @@ export function prepareAntigravityRequest(
             effectiveModel,
             tierThinkingLevel,
           );
+          if (isClaude55Model(effectiveModel) && req.generationConfig && typeof req.generationConfig === "object") {
+            delete (req.generationConfig as Record<string, unknown>).thinkingConfig;
+          }
 
           if (isGemini4ArgonModel(effectiveModel)) {
             sanitizeRequestPayloadForAntigravity(req, {
@@ -1492,7 +1500,7 @@ export function prepareAntigravityRequest(
           requestPayload.providerOptions as Record<string, unknown> | undefined,
           rawGenerationConfig,
         );
-        const usesThinkingLevel = isGemini3Model(effectiveModel) || isGemini4ArgonModel(effectiveModel);
+        const usesThinkingLevel = isGemini3Model(effectiveModel) || isGemini4ArgonModel(effectiveModel) || isClaude55Model(effectiveModel);
 
         log.debug(
           `[ThinkingResolution] rawModel=${rawModel} resolvedModel=${effectiveModel} resolvedTier=${tierThinkingLevel ?? "none"} variantLevel=${variantConfig?.thinkingLevel ?? "none"} variantBudget=${variantConfig?.thinkingBudget ?? "none"} providerOptions.google=${JSON.stringify((requestPayload.providerOptions as any)?.google ?? null)} generationConfig.thinkingConfig=${JSON.stringify((rawGenerationConfig as any)?.thinkingConfig ?? null)}`,
@@ -1524,6 +1532,7 @@ export function prepareAntigravityRequest(
 
         if (headerStyle === "antigravity") {
           effectiveModel = resolveAntigravityGemini4ArgonBackendModel(effectiveModel, tierThinkingLevel) ?? effectiveModel;
+          effectiveModel = resolveClaude55BackendModel(effectiveModel, tierThinkingLevel) ?? effectiveModel;
           const gemini38FlashBackendModel =
             resolveAntigravityGemini38FlashBackendModel(
               effectiveModel,
@@ -2201,6 +2210,10 @@ export function prepareAntigravityRequest(
         }
 
         stripInjectedDebugFromRequestPayload(requestPayload);
+        // Claude 5.5 reasoning is encoded by the backend ID, not Gemini settings.
+        if (isClaude55Model(effectiveModel) && requestPayload.generationConfig && typeof requestPayload.generationConfig === "object") {
+          delete (requestPayload.generationConfig as Record<string, unknown>).thinkingConfig;
+        }
         if (isGemini4ArgonModel(effectiveModel)) {
           ensureDefaultGeminiThinkingLevel(requestPayload, effectiveModel, tierThinkingLevel);
         }

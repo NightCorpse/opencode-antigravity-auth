@@ -153,15 +153,15 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
       max: { thinkingConfig: { thinkingBudget: 32768 } },
     },
   },
-  ...Object.fromEntries(["opus", "sonnet"].flatMap((family) =>
-    ["low", "medium", "high"].map((tier) => [
-      `antigravity-claude-${family}-5-5-${tier}`,
+  ...Object.fromEntries(["opus", "sonnet"].map((family) => [
+      `antigravity-claude-${family}-5-5`,
       {
-        name: `Claude ${family === "opus" ? "Opus" : "Sonnet"} 5.5 (${tier.charAt(0).toUpperCase() + tier.slice(1)}) (Antigravity)`,
+        name: `Claude ${family === "opus" ? "Opus" : "Sonnet"} 5.5 (Antigravity)`,
         limit: { context: 1000000, output: 128000 },
         modalities: { input: ["text", "image"], output: ["text"] },
+        variants: { low: { thinkingLevel: "low" }, medium: { thinkingLevel: "medium" }, high: { thinkingLevel: "high" } },
       } satisfies OpencodeModelDefinition,
-    ]))),
+    ])),
   "antigravity-gpt-oss-120b-medium": {
     name: "GPT-OSS 120B (Medium) (Antigravity)",
     limit: { context: 131072, output: 32768 },
@@ -189,6 +189,15 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
     modalities: { input: ["text", "image"], output: ["text", "image"] },
   },
 };
+
+/** Focused agy-style catalog, independent of account plans. Legacy definitions
+ * remain available to request resolvers but are not exposed or configured.
+ */
+export const OPENCODE_ACTIVE_MODEL_DEFINITIONS: OpencodeModelDefinitions = Object.fromEntries(
+  Object.entries(OPENCODE_MODEL_DEFINITIONS).filter(([id]) =>
+    id === "antigravity-gemini-3.8-flash" || id === "antigravity-gemini-4-argon" ||
+    id.startsWith("antigravity-claude-") || id === "antigravity-gpt-oss-120b-medium"),
+);
 
 function modelIdFromGeminiName(name: string | undefined): string | null {
   if (!name) return null;

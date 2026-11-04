@@ -303,6 +303,18 @@ export function isGeminiPublicOnlyModel(model: string): boolean {
  * @param requestedModel - The model name from the request
  * @returns Resolved model with thinking configuration
  */
+export function isClaude55Model(model: string): boolean {
+  return /^(?:antigravity-)?claude-(?:opus|sonnet)-5-5(?:-(?:minimal|low|medium|high))?$/i.test(model);
+}
+
+export function resolveClaude55BackendModel(model: string, thinkingLevel?: string): string | undefined {
+  if (!isClaude55Model(model)) return undefined;
+  const base = model.toLowerCase().replace(/^antigravity-/, "").replace(/-(minimal|low|medium|high)$/, "");
+  const level = thinkingLevel ?? model.toLowerCase().match(/-(minimal|low|medium|high)$/)?.[1] ?? "medium";
+  if (!["low", "medium", "high"].includes(level)) throw new Error(`Claude 5.5 does not support thinking level "${level}"; use low, medium, or high.`);
+  return `${base}-${level}`;
+}
+
 export function resolveModelWithTier(
   requestedModel: string,
 ): ResolvedModel {
@@ -317,6 +329,10 @@ export function resolveModelWithTier(
   const isImageModel = IMAGE_GENERATION_MODELS.test(modelWithoutQuota);
   const quotaPreference = "antigravity" as const;
   const explicitQuota = isAntigravity || isImageModel;
+  const claude55Backend = resolveClaude55BackendModel(modelWithoutQuota);
+  if (claude55Backend) {
+    return { actualModel: claude55Backend, isThinkingModel: true, quotaPreference, explicitQuota };
+  }
 
   // These suffixes identify real backend IDs, not legacy numeric-budget
   // variants. Preserve them verbatim and let the backend select reasoning.

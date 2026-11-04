@@ -4,9 +4,11 @@
 
 ### Added
 
-- Claude Opus/Sonnet 5.5 low/medium/high backend IDs, GPT-OSS 120B Medium, Gemini 2.5 Pro, Gemini 3.1/3.5 Flash Lite, and Gemini 3.1 Flash Image in the curated catalog. Claude 5.5 and GPT suffixes are preserved as backend IDs rather than stripped as legacy budget variants. GPT-OSS is advertised for removal on November 18, 2026.
+- Claude Opus/Sonnet 5.5 with OpenCode low/medium/high variants and GPT-OSS 120B Medium in the curated catalog. Claude variants select tier-specific backend IDs (medium by default); GPT keeps its Medium backend ID. Claude 4.6 and GPT-OSS are advertised for removal on November 18, 2026.
 
 ### Changed
+
+- Configure models and V2 discovery now use a focused catalog of Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus/Sonnet 5.5 and 4.6, and GPT-OSS 120B, independent of account plans. Other entries are removed from generated configuration; legacy request resolvers remain available for existing sessions.
 
 - Account selection and rotation consult fresh per-account catalogs, including the lowered backend tier. Missing/disabled models are excluded only for accounts with successful fresh discovery; unknown discovery remains retryable. Model visibility is not restricted by account entitlements.
 
@@ -21,15 +23,13 @@
 - **OpenCode V2 support** - Added a native V2 runtime adapter for OAuth, model discovery, Google Search, events, and HTTP request hooks while retaining the explicit V1 file entrypoint.
 - **Standalone account manager** - Added the `opencode-agy` and `opencode-antigravity` commands for account setup, verification, quota inspection, account management, and model configuration.
 - **Gemini 3.8 Flash** - Added `gemini-3.8-flash` and `antigravity-gemini-3.8-flash` with `low`, `medium`, and `high` thinking variants. Antigravity requests map to the tier-specific `gemini-3.8-flash-{low,medium,high}` backend ids, use the Antigravity consumer identity required by entitlement checks, and default to `medium`. The `gemini-flash-latest` alias now resolves to Gemini 3.8 Flash.
-- **Gemini 3.7 Flash** - Added stable `gemini-3.7-flash` and `antigravity-gemini-3.7-flash` model support with thinking variants (`minimal`, `low`, `medium`, `high`).
 - **Dynamic Antigravity Registry Pulling & Caching** - Discovered Antigravity models from `POST /v1internal:fetchAvailableModels` are now automatically cataloged, cached, and registered with dynamically inferred thinking variants for newly released models. When OpenCode initializes, model discovery can automatically authenticate using configured OAuth accounts to pull the latest models from the Antigravity registry.
 
-- **Gemini 3.6 Flash** - Added stable model support with tier-specific Antigravity backends, `medium` as the default, and API-key routing under its bare model ID.
 
 ### Fixed
 
 - **Antigravity endpoint routing** - Generation and quota discovery now use only the current Daily endpoint, with bounded retries for transient failures.
-- **Gemini tier routing** - OpenCode V2 preserves explicit thinking variants, and Gemini 3.7/3.8 Low, Medium, and High resolve to their dedicated backend ids.
+- **Gemini tier routing** - OpenCode V2 preserves explicit thinking variants, and Gemini 3.8 Low, Medium, and High resolve to their dedicated backend ids.
 - **403 model availability fallback** - A model-specific Antigravity 403 is now recognized as model-unavailable, distinct from credential or verification failures, and can route to the configured AGY SDK/API-key fallback instead of hard-failing.
 
 ### Changed
@@ -113,7 +113,7 @@
 - **Client Metadata Reduced** - Fingerprint client metadata trimmed to `ideType`, `platform`, `pluginType` only. Removed `osVersion`, `arch`, `sqmId`
 
 
-- **Search Model** - Changed from `gemini-2.0-flash` to `gemini-2.5-flash` for improved search result quality
+- **Search Model** - Updated the internal search backend for improved search result quality
 
 - **Deterministic Search Generation** - Search requests now use `temperature: 0` and `topP: 1` instead of thinking config
 
@@ -124,7 +124,7 @@
 - **#410**: Strip `x-goog-user-project` header for ALL header styles, not just Antigravity. This header caused 403 errors on Daily/Prod endpoints when the user's GCP project lacked Cloud Code API
 - **#370 / #336**: Account deletion now persists correctly. Root cause: `saveAccounts()` merged deleted accounts back from disk. Fixed by introducing `saveAccountsReplace()` for destructive writes and syncing in-memory state immediately
 - **#381**: Disabled accounts no longer selected via sticky index. `getCurrentAccountForFamily()` now skips disabled accounts and advances the active index
-- **#384**: `google_search` tool no longer returns empty citations when using `gemini-3-flash`. Search model switched to `gemini-2.5-flash`
+- **#384**: `google_search` tool no longer returns empty citations; updated the internal search backend
 - **#377**: Configure models flow now respects existing `opencode.jsonc` files instead of creating duplicate `opencode.json`
 - **Excessive Disk Writes** - Fixed project context auth updates causing 3000+ writes/sec during streaming. Changed from reference equality to value comparison on auth tokens and added throttled saves. Prevents SSD wear on macOS
 - **Fingerprint Alignment** - Force-regenerated fingerprints to match current Antigravity Manager behavior, fixing `ideType` and stripping stale client metadata fields
@@ -159,7 +159,7 @@
 
 ### Changed
 
-- **Model Naming and Routing** - Documented Antigravity-prefixed model names and automatic mapping to backend model names (e.g., `antigravity-gemini-3-flash` → `gemini-3-flash-preview`)
+- **Model Naming and Routing** - Documented Antigravity-prefixed model names and automatic mapping to backend model names
 
 
 
@@ -247,7 +247,7 @@
   - Returns formatted markdown with search results, sources with URLs, and search queries used
   - Supports optional URL analysis via `urlContext` when URLs are provided
   - Configurable thinking mode (deep vs fast) for search operations
-  - Uses `gemini-3-flash` model for fast, cost-effective search operations
+  - Uses a dedicated backend for fast, cost-effective search operations
 
 ### Changed
 

@@ -45,6 +45,8 @@ vi.mock("./plugin", () => ({
     provider: {
       models: async () => ({
         "antigravity-gemini-4-argon": OPENCODE_MODEL_DEFINITIONS["antigravity-gemini-4-argon"],
+        "antigravity-claude-opus-5-5": OPENCODE_MODEL_DEFINITIONS["antigravity-claude-opus-5-5"],
+        "antigravity-claude-sonnet-5-5": OPENCODE_MODEL_DEFINITIONS["antigravity-claude-sonnet-5-5"],
         "antigravity-gemini-3-pro": {
           name: "Gemini 3 Pro (Antigravity)",
         },
@@ -135,6 +137,10 @@ describe("OpenCodeV2Plugin", () => {
             list: () => [
               { id: "antigravity-gemini-3-pro" },
               { id: "antigravity-gemini-3.5-flash-low" },
+              { id: "antigravity-gemini-3.1-pro" },
+              { id: "antigravity-gemini-3-flash" },
+              { id: "antigravity-claude-sonnet-5-5-high" },
+              { id: "custom-google-model" },
               { id: "antigravity-gemini-3.8-flash" },
             ],
             remove: (_providerID, modelID) => { removedModels.push(modelID) },
@@ -226,9 +232,19 @@ describe("OpenCodeV2Plugin", () => {
         body: { generationConfig: { thinkingConfig: { thinkingLevel: level } } },
       })),
     })
+    for (const family of ["opus", "sonnet"]) {
+      expect(providerModels.find((model) => model.id === `antigravity-claude-${family}-5-5`)?.variants).toEqual(
+        ["low", "medium", "high"].map((level) => expect.objectContaining({
+          id: level, body: { generationConfig: { thinkingConfig: { thinkingLevel: level } } },
+        })),
+      )
+    }
     expect(removedModels).toEqual([
       "antigravity-gemini-3-pro",
       "antigravity-gemini-3.5-flash-low",
+      "antigravity-gemini-3.1-pro",
+      "antigravity-gemini-3-flash",
+      "antigravity-claude-sonnet-5-5-high",
     ])
 
     const authorization = await oauthRegistration?.authorize()

@@ -10,8 +10,22 @@ const thirdPartyIds = [
 ];
 
 describe("new advertised model backend IDs", () => {
+  describe.each([false, true])("Claude 5.5 variants wrapped=%s", (wrapped) => {
+    it.each(["low", "medium", "high"])("maps %s to the exact backend without forwarding Gemini thinking settings", (level) => {
+      for (const family of ["opus", "sonnet"]) {
+        const model = `claude-${family}-5-5`;
+        const payload = { contents: [], generationConfig: { thinkingConfig: { thinkingLevel: level } } };
+        const result = prepareAntigravityRequest(
+          `https://generativelanguage.googleapis.com/v1beta/models/antigravity-${model}:generateContent`,
+          { method: "POST", body: JSON.stringify(wrapped ? { project: "p", request: payload } : payload) }, "token", "p",
+        );
+        expect(result.effectiveModel).toBe(`${model}-${level}`);
+        expect(JSON.parse(result.init.body as string).request.generationConfig?.thinkingConfig).toBeUndefined();
+      }
+    });
+  });
   it.each(thirdPartyIds)("preserves %s without converting its backend suffix into a legacy budget", (id) => {
-    expect(OPENCODE_MODEL_DEFINITIONS[`antigravity-${id}`]).toBeDefined();
+    expect(OPENCODE_MODEL_DEFINITIONS[`antigravity-${id.startsWith("claude") ? id.replace(/-(low|medium|high)$/, "") : id}`]).toBeDefined();
     const resolved = resolveModelWithTier(`antigravity-${id}`);
     expect(resolved.actualModel).toBe(id);
     expect(resolved.thinkingBudget).toBeUndefined();

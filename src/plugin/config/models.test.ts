@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import {
   OPENCODE_MODEL_DEFINITIONS,
+  OPENCODE_ACTIVE_MODEL_DEFINITIONS,
   modelsFromAntigravityAvailableModels,
   modelsFromGeminiApi,
 } from "./models";
@@ -15,18 +17,31 @@ const getModel = (name: string) => {
 };
 
 describe("OPENCODE_MODEL_DEFINITIONS", () => {
+  it("keeps the README copy-paste model configuration aligned with the active catalog", () => {
+    const readme = readFileSync(new URL("../../../README.md", import.meta.url), "utf8");
+    const section = readme.slice(readme.indexOf("<summary><b>Full models configuration"));
+    const json = section.match(/```json\n([\s\S]*?)\n```/)?.[1];
+    if (!json) throw new Error("Missing README model configuration");
+    expect(JSON.parse(json).provider.google.models).toEqual(OPENCODE_ACTIVE_MODEL_DEFINITIONS);
+  });
+  it("configures the full supported catalog independently of account entitlements, excluding retired routes", () => {
+    expect(Object.keys(OPENCODE_ACTIVE_MODEL_DEFINITIONS)).toHaveLength(7);
+    expect(OPENCODE_ACTIVE_MODEL_DEFINITIONS["antigravity-gemini-4-argon"]).toBeDefined();
+    expect(OPENCODE_ACTIVE_MODEL_DEFINITIONS["antigravity-claude-opus-5-5"]?.variants).toEqual({
+      low: { thinkingLevel: "low" }, medium: { thinkingLevel: "medium" }, high: { thinkingLevel: "high" },
+    });
+    for (const id of ["2.5-pro", "3-flash", "3-pro", "3.1-pro", "3.1-flash-lite", "3.1-flash-image", "3.5-flash", "3.5-flash-lite", "3.6-flash", "3.7-flash"]) {
+      expect(OPENCODE_ACTIVE_MODEL_DEFINITIONS[`antigravity-gemini-${id}`]).toBeUndefined();
+    }
+  });
   it("includes the full set of configured models", () => {
     const modelNames = Object.keys(OPENCODE_MODEL_DEFINITIONS).sort();
 
     expect(modelNames).toEqual([
       "antigravity-claude-opus-4-6-thinking",
-      "antigravity-claude-opus-5-5-high",
-      "antigravity-claude-opus-5-5-low",
-      "antigravity-claude-opus-5-5-medium",
+      "antigravity-claude-opus-5-5",
       "antigravity-claude-sonnet-4-6",
-      "antigravity-claude-sonnet-5-5-high",
-      "antigravity-claude-sonnet-5-5-low",
-      "antigravity-claude-sonnet-5-5-medium",
+      "antigravity-claude-sonnet-5-5",
       "antigravity-gemini-2.5-pro",
       "antigravity-gemini-3-flash",
       "antigravity-gemini-3-pro",

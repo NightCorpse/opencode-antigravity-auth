@@ -2,11 +2,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth so you can use Antigravity rate limits and access models like `gemini-3.1-pro` and `claude-opus-4-6-thinking` with your Google credentials.
+Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth so you can use Antigravity rate limits and access Gemini 4 Argon, Gemini 3.8 Flash, Claude, and GPT-OSS models with your Google credentials.
 
 ## What You Get
 
-- **Claude Opus 4.6, Sonnet 4.6** and **Gemini 3.1 Pro / 3.8 Flash** via Google OAuth
+- **Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus/Sonnet 5.5 and 4.6, and GPT-OSS 120B** via Google OAuth (availability depends on the account)
 - **Multi-account support** — add multiple Google accounts, auto-rotates when rate-limited
 - **Modern Gemini API support** — use Antigravity SDK-style API keys / Cloud Projects as Gemini backups or opt-in primary routing
 - **Thinking models** — extended thinking for Claude and Gemini 3 with configurable budgets
@@ -157,27 +157,19 @@ npm run link-bin
 
 | Model | Variants | Notes |
 |-------|----------|-------|
-| ~~`antigravity-gemini-3-pro`~~ | low, high | Discontinued by Google |
-| `antigravity-gemini-3.1-pro` | low, high | Gemini 3.1 Pro with thinking (rollout-dependent) |
-| `antigravity-gemini-3-flash` | minimal, low, medium, high | Gemini 3 Flash with thinking |
-| ~~`antigravity-gemini-3.5-flash`~~ | minimal, low, medium, high | Discontinued by Google |
-| `antigravity-gemini-3.6-flash` | low, medium, high | Gemini 3.6 Flash with thinking (medium default) |
-| `antigravity-gemini-3.7-flash` | minimal, low, medium, high | Gemini 3.7 Flash with thinking |
 | `antigravity-gemini-3.8-flash` | low, medium, high | Gemini 3.8 Flash with thinking (medium default) |
 | `antigravity-gemini-4-argon` | low, medium, high | Gemini 4 Argon with thinking (medium default; account-dependent availability) |
-| `antigravity-claude-sonnet-4-6` | — | Claude Sonnet 4.6 |
-| `antigravity-claude-opus-4-6-thinking` | low, max | Claude Opus 4.6 with extended thinking |
-| `antigravity-claude-opus-5-5-{low,medium,high}` | Separate model IDs | Claude Opus 5.5; 1M context, 128k output; account-dependent |
-| `antigravity-claude-sonnet-5-5-{low,medium,high}` | Separate model IDs | Claude Sonnet 5.5; 1M context, 128k output; account-dependent |
+| `antigravity-claude-sonnet-4-6` | — | Claude Sonnet 4.6; account-dependent; removal announced for November 18, 2026 |
+| `antigravity-claude-opus-4-6-thinking` | low, max | Claude Opus 4.6 with extended thinking; account-dependent; removal announced for November 18, 2026 |
+| `antigravity-claude-opus-5-5` | low, medium, high | Claude Opus 5.5; medium default; 1M context, 128k output; account-dependent |
+| `antigravity-claude-sonnet-5-5` | low, medium, high | Claude Sonnet 5.5; medium default; 1M context, 128k output; account-dependent |
 | `antigravity-gpt-oss-120b-medium` | — | GPT-OSS 120B; 131,072 context, 32,768 output; server announces removal on November 18, 2026 |
-| `antigravity-gemini-2.5-pro` | — | Gemini 2.5 Pro |
-| `antigravity-gemini-3.1-flash-lite` | — | Gemini 3.1 Flash Lite |
-| `antigravity-gemini-3.5-flash-lite` | — | Gemini 3.5 Flash Lite |
-| `antigravity-gemini-3.1-flash-image` | — | Gemini 3.1 Flash Image |
 
 Argon OAuth requests use the tier-specific Antigravity backend IDs (`gemini-4-argon-low`, `-medium`, `-high`) and CLI 1.4.0 identity. The public Gemini API uses the bare `gemini-4-argon` ID instead.
 
 `opencode-agy quota` displays the official usage-summary groups and every quota window returned for each account, including shared Gemini limits and separate Argon limits when applicable. Windows, balances, and reset times come from the server rather than hardcoded plan rules. If the summary API is unavailable, it falls back to legacy per-model quota inspection.
+
+**Configure models** installs the focused catalog above, not just models available to your current accounts, and removes other entries from the generated Google model configuration. Legacy routing remains for existing sessions. Account catalogs refresh at OAuth-runtime and account-manager startup; fresh discovery guides rotation without changing the selected model. Discovery failures leave access unknown rather than permanently denying an account.
 
 **Antigravity SDK / Gemini API projects** (API-key backed; used by API-key auth, or as OAuth fallback when configured):
 
@@ -211,62 +203,12 @@ Add this to your `~/.config/opencode/opencode.json`:
   "provider": {
     "google": {
       "models": {
-        "antigravity-gemini-3-pro": {
-          "name": "Gemini 3 Pro (Antigravity)",
-          "limit": { "context": 1048576, "output": 65535 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
-          "variants": {
-            "low": { "thinkingLevel": "low" },
-            "high": { "thinkingLevel": "high" }
-          }
-        },
-        "antigravity-gemini-3.1-pro": {
-          "name": "Gemini 3.1 Pro (Antigravity)",
-          "limit": { "context": 1048576, "output": 65535 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
-          "variants": {
-            "low": { "thinkingLevel": "low" },
-            "high": { "thinkingLevel": "high" }
-          }
-        },
-        "antigravity-gemini-3-flash": {
-          "name": "Gemini 3 Flash (Antigravity)",
+        "antigravity-gemini-4-argon": {
+          "name": "Gemini 4 Argon (Antigravity)",
+          "temperature": false,
           "limit": { "context": 1048576, "output": 65536 },
           "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
           "variants": {
-            "minimal": { "thinkingLevel": "minimal" },
-            "low": { "thinkingLevel": "low" },
-            "medium": { "thinkingLevel": "medium" },
-            "high": { "thinkingLevel": "high" }
-          }
-        },
-        "antigravity-gemini-3.5-flash": {
-          "name": "Gemini 3.5 Flash (Antigravity)",
-          "limit": { "context": 1048576, "output": 65536 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
-          "variants": {
-            "minimal": { "thinkingLevel": "minimal" },
-            "low": { "thinkingLevel": "low" },
-            "medium": { "thinkingLevel": "medium" },
-            "high": { "thinkingLevel": "high" }
-          }
-        },
-        "antigravity-gemini-3.6-flash": {
-          "name": "Gemini 3.6 Flash (Antigravity)",
-          "limit": { "context": 1048576, "output": 65536 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
-          "variants": {
-            "low": { "thinkingLevel": "low" },
-            "medium": { "thinkingLevel": "medium" },
-            "high": { "thinkingLevel": "high" }
-          }
-        },
-        "antigravity-gemini-3.7-flash": {
-          "name": "Gemini 3.7 Flash (Antigravity)",
-          "limit": { "context": 1048576, "output": 65536 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
-          "variants": {
-            "minimal": { "thinkingLevel": "minimal" },
             "low": { "thinkingLevel": "low" },
             "medium": { "thinkingLevel": "medium" },
             "high": { "thinkingLevel": "high" }
@@ -274,6 +216,7 @@ Add this to your `~/.config/opencode/opencode.json`:
         },
         "antigravity-gemini-3.8-flash": {
           "name": "Gemini 3.8 Flash (Antigravity)",
+          "temperature": false,
           "limit": { "context": 1048576, "output": 65536 },
           "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
           "variants": {
@@ -281,6 +224,31 @@ Add this to your `~/.config/opencode/opencode.json`:
             "medium": { "thinkingLevel": "medium" },
             "high": { "thinkingLevel": "high" }
           }
+        },
+        "antigravity-claude-opus-5-5": {
+          "name": "Claude Opus 5.5 (Antigravity)",
+          "limit": { "context": 1000000, "output": 128000 },
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "variants": {
+            "low": { "thinkingLevel": "low" },
+            "medium": { "thinkingLevel": "medium" },
+            "high": { "thinkingLevel": "high" }
+          }
+        },
+        "antigravity-claude-sonnet-5-5": {
+          "name": "Claude Sonnet 5.5 (Antigravity)",
+          "limit": { "context": 1000000, "output": 128000 },
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "variants": {
+            "low": { "thinkingLevel": "low" },
+            "medium": { "thinkingLevel": "medium" },
+            "high": { "thinkingLevel": "high" }
+          }
+        },
+        "antigravity-gpt-oss-120b-medium": {
+          "name": "GPT-OSS 120B (Medium) (Antigravity)",
+          "limit": { "context": 131072, "output": 32768 },
+          "modalities": { "input": ["text"], "output": ["text"] }
         },
         "antigravity-claude-sonnet-4-6": {
           "name": "Claude Sonnet 4.6 (Antigravity)",
@@ -460,8 +428,8 @@ If you encounter errors during a session:
 {
   "google_auth": false,
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3.1-pro#high" },
-    "document-writer": { "model": "google/antigravity-gemini-3-flash" }
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-4-argon#high" },
+    "document-writer": { "model": "google/antigravity-gemini-3.8-flash" }
   }
 }
 ```
@@ -592,9 +560,9 @@ Disable built-in auth and override agent models in `oh-my-opencode.json`:
 {
   "google_auth": false,
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3.1-pro#high" },
-    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
-    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-4-argon#high" },
+    "document-writer": { "model": "google/antigravity-gemini-3.8-flash" },
+    "multimodal-looker": { "model": "google/antigravity-gemini-3.8-flash" }
   }
 }
 ```
@@ -635,7 +603,7 @@ Most users don't need to configure anything — defaults work well.
 The official Antigravity SDK quickstart uses `GEMINI_API_KEY`. You can provide one key via environment variable:
 
 ```bash
-GEMINI_API_KEY=your-key opencode run "Hello" --model=google/gemini-3-pro
+GEMINI_API_KEY=your-key opencode run "Hello" --model=google/gemini-3.8-flash
 ```
 
 For multiple Cloud Projects / API keys, add them to `~/.config/opencode/antigravity.json`:

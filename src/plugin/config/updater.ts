@@ -7,7 +7,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
-import { OPENCODE_MODEL_DEFINITIONS } from "./models";
+import { OPENCODE_ACTIVE_MODEL_DEFINITIONS } from "./models";
 
 // =============================================================================
 // Types
@@ -196,7 +196,9 @@ export async function updateOpencodeConfig(
     const googleProvider = targetProviders.google as Record<string, unknown>;
 
     // Replace google models with plugin models
-    googleProvider.models = { ...OPENCODE_MODEL_DEFINITIONS };
+    // Install all supported models, regardless of the currently connected plans.
+    // Replacing the map also removes retired plugin routes from earlier installs.
+    googleProvider.models = { ...OPENCODE_ACTIVE_MODEL_DEFINITIONS };
 
     // Ensure config directory exists
     const configDir = dirname(configPath);

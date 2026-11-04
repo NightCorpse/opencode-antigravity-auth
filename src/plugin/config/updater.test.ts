@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { updateOpencodeConfig } from "./updater";
-import { OPENCODE_MODEL_DEFINITIONS } from "./models";
+import { OPENCODE_ACTIVE_MODEL_DEFINITIONS as OPENCODE_MODEL_DEFINITIONS } from "./models";
 
 describe("updateOpencodeConfig", () => {
   let tempDir: string;
@@ -67,8 +67,12 @@ describe("updateOpencodeConfig", () => {
     // Old model should be replaced
     expect(writtenConfig.providers.google.models["old-model"]).toBeUndefined();
     // New models should be present
-    expect(writtenConfig.providers.google.models["antigravity-gemini-3-pro"]).toBeDefined();
+    expect(writtenConfig.providers.google.models["antigravity-gemini-3.8-flash"]).toBeDefined();
+    expect(writtenConfig.providers.google.models["antigravity-gemini-3-pro"]).toBeUndefined();
     expect(writtenConfig.providers.google.models["antigravity-claude-sonnet-4-6"]).toBeDefined();
+    expect(writtenConfig.providers.google.models["antigravity-claude-sonnet-5-5"]?.variants.high).toBeDefined();
+    expect(writtenConfig.providers.google.models["antigravity-claude-sonnet-5-5-high"]).toBeUndefined();
+    expect(writtenConfig.providers.google.models["antigravity-gpt-oss-120b-medium"]).toBeDefined();
   });
 
   test("preserves non-google provider sections", async () => {
@@ -236,7 +240,7 @@ describe("updateOpencodeConfig", () => {
     expect(writtenConfig.plugins).toContain("other-plugin");
     expect(writtenConfig.plugins).toContain("opencode-antigravity-auth@latest");
     expect(writtenConfig.providers.google.region).toBe("us-central1");
-    expect(writtenConfig.providers.google.models["antigravity-gemini-3-pro"]).toBeDefined();
+    expect(writtenConfig.providers.google.models["antigravity-gemini-3.8-flash"]).toBeDefined();
   });
 
   test("prefers existing opencode.jsonc when using default config path", async () => {
