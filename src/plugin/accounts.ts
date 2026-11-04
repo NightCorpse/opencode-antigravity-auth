@@ -445,6 +445,20 @@ export class AccountManager {
   /** Tracks an in-flight disk write so flushSaveToDisk can await a write that has
    * already started (savePending is cleared before the write settles). */
   private activeSave: Promise<void> | null = null;
+  private modelSnapshots: Record<string, AccountModelSnapshot> = {};
+
+  setModelAvailability(snapshots: Record<string, AccountModelSnapshot>): void {
+    this.modelSnapshots = snapshots;
+  }
+
+  canUseModel(account: ManagedAccount, model?: string | null): boolean {
+    return !model || accountModelAvailability(this.modelSnapshots[accountModelKey(account.parts.refreshToken)], model) !== "unavailable";
+  }
+
+  hasModelCandidate(model?: string | null, excluded?: Set<number>): boolean {
+    return this.accounts.some((account) => account.enabled !== false && !account.verificationRequired &&
+      !account.reauthRequired && !excluded?.has(account.index) && this.canUseModel(account, model));
+  }
 
   static async loadFromDisk(authFallback?: OAuthAuthDetails): Promise<AccountManager> {
     const stored = await loadAccounts();
@@ -654,7 +668,7 @@ export class AccountManager {
       const tokenTracker = getTokenTracker();
       
       const accountsWithMetrics: AccountWithMetrics[] = this.accounts
-        .filter(acc => acc.enabled !== false && acc.verificationRequired !== true && acc.reauthRequired !== true && !excludeIndices?.has(acc.index))
+        .filter(acc => acc.enabled !== false && acc.verificationRequired !== true && acc.reauthRequired !== true && !excludeIndices?.has(acc.index) && this.canUseModel(acc, model))
         .map(acc => {
           clearExpiredRateLimits(acc);
           return {
@@ -701,7 +715,7 @@ export class AccountManager {
     }
 
     const current = this.getCurrentAccountForFamily(family);
-    if (current && !excludeIndices?.has(current.index)) {
+    if (current && !excludeIndices?.has(current.index) && this.canUseModel(current, model)) {
       clearExpiredRateLimits(current);
       const isLimitedForRequestedStyle = isRateLimitedForHeaderStyle(current, family, headerStyle, model);
       const isOverThreshold = isOverSoftQuotaThreshold(current, family, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs, model);
@@ -724,7 +738,8 @@ export class AccountManager {
       clearExpiredRateLimits(a);
       return a.enabled !== false &&
              a.verificationRequired !== true &&
-             a.reauthRequired !== true &&
+              a.reauthRequired !== true &&
+              this.canUseModel(a, model) &&
              !excludeIndices?.has(a.index) &&
              !isRateLimitedForHeaderStyle(a, family, headerStyle, model) &&
              !isOverSoftQuotaThreshold(a, family, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs, model) &&
@@ -1476,3 +1491,5 @@ export class AccountManager {
     return minWait === 0 ? null : minWait;
   }
 }
+import { accountModelAvailability, accountModelKey } from "./account-models";
+import type { AccountModelSnapshot } from "./account-models";

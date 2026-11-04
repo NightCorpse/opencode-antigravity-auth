@@ -10,6 +10,7 @@ import type { AccountMetadataV3 } from "./storage";
 import { refreshAccessToken } from "./token";
 import type { PluginClient } from "./types";
 import { createLogger } from "./logger";
+import { resolveModelWithTier } from "./transform/model-resolver";
 
 const log = createLogger("account-models");
 export const ACCOUNT_MODELS_TTL_MS = 5 * 60 * 1000;
@@ -20,6 +21,20 @@ export interface AccountModelSnapshot {
   checkedAt?: number;
   /** Undefined means unknown (including failed discovery), never denied. */
   models?: string[];
+}
+
+/** Unknown catalogs fail open; only fresh successful discovery can exclude an account. */
+export function accountModelAvailability(snapshot: AccountModelSnapshot | undefined, model: string): "available" | "unavailable" | "unknown" {
+  if (!snapshot?.models || !snapshot.checkedAt || Date.now() - snapshot.checkedAt > ACCOUNT_MODELS_TTL_MS) return "unknown";
+  const id = model.toLowerCase().replace(/^models\//, "").replace(/^antigravity-/, "");
+  const models = new Set(snapshot.models.map((entry) => entry.toLowerCase()));
+  if (models.has(id)) return id.endsWith("-disabled") ? "unavailable" : "available";
+  // Public base IDs may select any advertised reasoning tier. Exact backend IDs
+  // are checked again after request lowering, before any generation/warmup.
+  if (!/-(minimal|low|medium|high|max)$/.test(id) &&
+      [...models].some((entry) => entry.startsWith(`${id}-`) && /-(low|medium|high)$/.test(entry))) return "available";
+  const resolved = resolveModelWithTier(model).actualModel.toLowerCase();
+  return models.has(resolved) && !resolved.endsWith("-disabled") ? "available" : "unavailable";
 }
 
 interface CatalogFile {

@@ -48,7 +48,7 @@ import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker";
 import { loadConfig, initRuntimeConfig, type AntigravityConfig } from "./plugin/config";
 import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery";
 import { checkAccountsQuota, fetchAvailableModels } from "./plugin/quota";
-import { refreshAccountModelAvailability } from "./plugin/account-models";
+import { ACCOUNT_MODELS_TTL_MS, accountModelKey, loadAccountModelSnapshots, refreshAccountModelAvailability } from "./plugin/account-models";
 import { initDiskSignatureCache } from "./plugin/cache";
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue";
 import { initLogger, createLogger } from "./plugin/logger";
@@ -2042,6 +2042,19 @@ export const createAntigravityPlugin = (providerId: string) => async (
           const urlString = toUrlString(input);
           const family = getModelFamilyFromUrl(urlString);
           const model = extractModelFromUrl(urlString);
+          // Reload shared discovery state so CLI refreshes are visible to a live
+          // runtime. Refresh stale/unknown accounts before using cached exclusions.
+          const currentPool = await loadAccounts();
+          let modelSnapshots = await loadAccountModelSnapshots();
+          const staleAccounts = (currentPool?.accounts ?? []).filter((account) => {
+            const snapshot = modelSnapshots[accountModelKey(account.refreshToken)];
+            return !snapshot?.checkedAt || Date.now() - snapshot.checkedAt > ACCOUNT_MODELS_TTL_MS;
+          });
+          if (staleAccounts.length) {
+            await refreshAccountModelAvailability(staleAccounts, client, providerId);
+            modelSnapshots = await loadAccountModelSnapshots();
+          }
+          accountManager.setModelAvailability(modelSnapshots);
           const agySdkCredentials = getAgySdkCredentials(config, apiKeyAuth);
           const debugLines: string[] = [];
           const pushDebug = (line: string) => {
@@ -2075,6 +2088,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
           // Absolute safety net: bound total loop iterations so the request can
           // never spin the event loop, regardless of account/quota state.
           let loopGuard = 0;
+          let availabilityRefreshAttempted = false;
 
           // Helper to check if request was aborted
           const checkAborted = () => {
@@ -2190,12 +2204,21 @@ export const createAntigravityPlugin = (providerId: string) => async (
 
             
             if (!account) {
+              if (!accountManager.hasModelCandidate(model) && !availabilityRefreshAttempted) {
+                availabilityRefreshAttempted = true;
+                await refreshAccountModelAvailability((await loadAccounts())?.accounts ?? [], client, providerId);
+                accountManager.setModelAvailability(await loadAccountModelSnapshots());
+                continue;
+              }
+              if (!accountManager.hasModelCandidate(model)) {
+                throw new Error(`No enabled Antigravity account has advertised access to ${model ?? family}. Check your enabled accounts or plan.`);
+              }
               // Every usable account was already tried (and switched away from)
               // during THIS request. Nothing left to route to, so give up
               // gracefully rather than waiting on accounts that won't recover
               // mid-request (this is the case that previously spun forever for
               // an Antigravity-only model whose antigravity pool is exhausted).
-              if (accountCount > 0 && triedSwitchIndices.size >= accountCount) {
+              if (accountCount > 0 && !accountManager.hasModelCandidate(model, triedSwitchIndices)) {
                 // Terminal (last-resort) fallback: every account has been tried, so
                 // there is nothing left to rotate to. Intentionally UNguarded — we
                 // return whatever the SDK gives, even a retryable failure, as a
@@ -2584,6 +2607,12 @@ export const createAntigravityPlugin = (providerId: string) => async (
                 );
 
                 const originalUrl = toUrlString(input);
+                if (!accountManager.canUseModel(account, prepared.effectiveModel)) {
+                  triedSwitchIndices.add(account.index);
+                  shouldSwitchAccount = true;
+                  lastError = new Error(`Account does not advertise ${prepared.effectiveModel ?? model}`);
+                  break;
+                }
                 const resolvedUrl = toUrlString(prepared.request);
                 pushDebug(`endpoint=${currentEndpoint}`);
                 pushDebug(`resolved=${sanitizeUrlForLog(resolvedUrl)}`);
@@ -2889,6 +2918,17 @@ export const createAntigravityPlugin = (providerId: string) => async (
                   permissionDeniedOnProject = isModelPermissionDeniedOnProjectError(errorBodyText);
                 }
 
+                // Entitlements differ between accounts/plans. Try each account
+                // before any API-key fallback, without disabling the whole account.
+                if (response.status === 404 || permissionDeniedOnProject) {
+                  lastFailure = createFailureContext(response);
+                  triedSwitchIndices.add(account.index);
+                  if (accountManager.hasModelCandidate(model, triedSwitchIndices)) {
+                    shouldSwitchAccount = true;
+                    break;
+                  }
+                }
+
                 const shouldRetryEndpoint = (
                   (response.status === 403 && !permissionDeniedOnProject) ||
                   response.status === 404 ||
@@ -2907,8 +2947,8 @@ export const createAntigravityPlugin = (providerId: string) => async (
                 // A 403 PERMISSION_DENIED with "Permission denied on resource project"
                 // means the resolved backend model id isn't entitled for this managed
                 // project (e.g. a staged Google rollout gate) — same practical effect as
-                // a 404 from the caller's perspective. In both cases retrying other
-                // endpoints or accounts can't help, but the public Gemini API (api-key
+                // a 404 from the caller's perspective. Other eligible accounts have
+                // already been attempted above; the public Gemini API (api-key
                 // path) may serve it. Fall back to the agy-sdk SDK/API path so a model
                 // that's unavailable on Antigravity but available via the API key still
                 // succeeds. This mirrors the 429 path, which already falls back.

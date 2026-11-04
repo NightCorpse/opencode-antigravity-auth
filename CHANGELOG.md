@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Account selection and rotation consult fresh per-account catalogs, including the lowered backend tier. Missing/disabled models are excluded only for accounts with successful fresh discovery; unknown discovery remains retryable. Model visibility is not restricted by account entitlements.
+
 - Per-account model catalogs are refreshed when the OAuth runtime loads and when the standalone account manager opens. Discovery uses a separate, locked cache with generation checks, preserving administrative account storage.
 
 - Account-manager quota inspection now uses `retrieveUserQuotaSummary`, displaying server-defined groups and all usage windows (including account-specific Argon limits). Legacy model quota discovery remains a fallback; rotation caches are unchanged.
