@@ -48,6 +48,7 @@ import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker";
 import { loadConfig, initRuntimeConfig, type AntigravityConfig } from "./plugin/config";
 import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery";
 import { checkAccountsQuota, fetchAvailableModels } from "./plugin/quota";
+import { refreshAccountModelAvailability } from "./plugin/account-models";
 import { initDiskSignatureCache } from "./plugin/cache";
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue";
 import { initLogger, createLogger } from "./plugin/logger";
@@ -1957,6 +1958,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
       // If OpenCode's refresh token doesn't match any stored account, clear stale storage
       const authParts = parseRefreshParts(auth.refresh);
       const storedAccounts = await loadAccounts();
+      await refreshAccountModelAvailability(storedAccounts?.accounts ?? [], client, providerId);
       
       // Note: AccountManager now ensures the current auth is always included in accounts
 

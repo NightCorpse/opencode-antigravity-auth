@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Per-account model catalogs are refreshed when the OAuth runtime loads and when the standalone account manager opens. Discovery uses a separate, locked cache with generation checks, preserving administrative account storage.
+
 - Account-manager quota inspection now uses `retrieveUserQuotaSummary`, displaying server-defined groups and all usage windows (including account-specific Argon limits). Legacy model quota discovery remains a fallback; rotation caches are unchanged.
 
 ## [1.8.0] - 2026-09-24

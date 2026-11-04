@@ -15,6 +15,7 @@ import {
   type AccountStorageV4,
 } from "./storage";
 import { checkAccountsQuota } from "./quota";
+import { refreshStoredAccountModels } from "./account-models";
 import {
   formatRefreshParts,
   parseRefreshParts,
@@ -528,6 +529,7 @@ export async function runInteractiveAccountManager(
     process.env.SSH_TTY ||
     process.env.OPENCODE_HEADLESS
   );
+  await refreshStoredAccountModels(client, providerId);
 
   // Handle direct command-line arguments (e.g. "quota" or "-q")
   const firstArg = args[0]?.toLowerCase();

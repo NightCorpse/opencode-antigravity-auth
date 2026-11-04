@@ -7,6 +7,8 @@ import type { PluginClient } from "./plugin/types";
 import { AccountManager } from "./plugin/accounts";
 import { DEFAULT_CONFIG } from "./plugin/config";
 
+vi.mock("./plugin/account-models", () => ({ refreshAccountModelAvailability: vi.fn(async () => {}) }));
+
 vi.mock("@opencode-ai/plugin", () => ({
   tool: Object.assign(
     (definition: unknown) => definition,
