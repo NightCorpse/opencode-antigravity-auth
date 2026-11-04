@@ -2,6 +2,7 @@ import {
   ANTIGRAVITY_ENDPOINT_DAILY,
   getAntigravityHeaders,
   ANTIGRAVITY_PROVIDER_ID,
+  ANTIGRAVITY_ARGON_CLI_USER_AGENT,
 } from "../constants";
 import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "./auth";
 import { logQuotaFetch, logQuotaStatus } from "./debug";
@@ -24,8 +25,94 @@ export interface QuotaGroupSummary {
 
 export interface QuotaSummary {
   groups: Partial<Record<QuotaGroup, QuotaGroupSummary>>;
+  usageGroups?: UsageQuotaGroup[];
+  description?: string;
   modelCount: number;
   error?: string;
+}
+
+export interface UsageQuotaBucket {
+  bucketId: string;
+  displayName: string;
+  description?: string;
+  window?: string;
+  remainingFraction?: number;
+  remainingAmount?: string | number;
+  resetTime?: string;
+  disabled?: boolean;
+}
+
+export interface UsageQuotaGroup {
+  displayName: string;
+  description?: string;
+  buckets: UsageQuotaBucket[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseUsageSummary(value: unknown): QuotaSummary {
+  if (!isRecord(value)) throw new Error("Invalid quota summary");
+  // Older servers expose a flat bucket list instead of named groups.
+  const groups: unknown = value.groups ?? (Array.isArray(value.buckets)
+    ? [{ displayName: "Antigravity", buckets: value.buckets }] : undefined);
+  if (!Array.isArray(groups) || groups.length === 0) throw new Error("Missing quota groups");
+  const usageGroups = groups.map((group): UsageQuotaGroup => {
+    if (!isRecord(group) || typeof group.displayName !== "string" || !Array.isArray(group.buckets)) {
+      throw new Error("Invalid quota group");
+    }
+    const buckets = group.buckets.map((bucket): UsageQuotaBucket => {
+      if (!isRecord(bucket) || typeof bucket.bucketId !== "string" || typeof bucket.displayName !== "string") {
+        throw new Error("Invalid quota bucket");
+      }
+      return {
+        bucketId: bucket.bucketId,
+        displayName: bucket.displayName,
+        description: typeof bucket.description === "string" ? bucket.description : undefined,
+        window: typeof bucket.window === "string" ? bucket.window : undefined,
+        remainingFraction: typeof bucket.remainingFraction === "number" && Number.isFinite(bucket.remainingFraction)
+          ? normalizeRemainingFraction(bucket.remainingFraction) : undefined,
+        remainingAmount: typeof bucket.remainingAmount === "string" ||
+          (typeof bucket.remainingAmount === "number" && Number.isFinite(bucket.remainingAmount))
+          ? bucket.remainingAmount : undefined,
+        resetTime: typeof bucket.resetTime === "string" && parseResetTime(bucket.resetTime) !== null
+          ? bucket.resetTime : undefined,
+        disabled: bucket.disabled === true,
+      };
+    });
+    return {
+      displayName: group.displayName,
+      description: typeof group.description === "string" ? group.description : undefined,
+      buckets,
+    };
+  });
+  if (!usageGroups.some((group) => group.buckets.length > 0)) throw new Error("Empty quota summary");
+  // Usage windows must not be flattened into the legacy per-family rotation cache.
+  return { groups: {}, modelCount: 0, usageGroups,
+    description: typeof value.description === "string" ? value.description : undefined };
+}
+
+export async function fetchAccountQuotaSummary(accessToken: string, projectId: string): Promise<QuotaSummary> {
+  try {
+    const response = await fetchWithTimeout(`${ANTIGRAVITY_ENDPOINT_DAILY}/v1internal:retrieveUserQuotaSummary`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": ANTIGRAVITY_ARGON_CLI_USER_AGENT,
+      },
+      body: JSON.stringify({ project: projectId }),
+    });
+    if (!response.ok) throw new Error(`Quota summary HTTP ${response.status}`);
+    return parseUsageSummary(await response.json());
+  } catch {
+    // Compatibility fallback for accounts/servers without the summary API.
+    const legacy = await fetchAvailableModels(accessToken, projectId);
+    if (!legacy.models) throw new Error("Failed to fetch Antigravity quota");
+    recordAntigravityAvailableModels(legacy.models);
+    return aggregateQuota(legacy.models);
+  }
 }
 
 export type AccountQuotaStatus = "ok" | "disabled" | "error";
@@ -301,23 +388,10 @@ async function checkSingleAccountQuota(
     auth = projectContext.auth;
     const updatedAccount = applyAccountUpdates(account, auth);
 
-    let quotaResult: QuotaSummary;
-    const antigravityResponse = await fetchAvailableModels(
+    const quotaResult = await fetchAccountQuotaSummary(
       auth.access ?? "",
       projectContext.effectiveProjectId,
-    ).catch((): FetchAvailableModelsResponse => ({ models: undefined }));
-
-    // Process Antigravity quota
-    if (antigravityResponse.models === undefined) {
-      quotaResult = {
-        groups: {},
-        modelCount: 0,
-        error: "Failed to fetch Antigravity quota",
-      };
-    } else {
-      recordAntigravityAvailableModels(antigravityResponse.models);
-      quotaResult = aggregateQuota(antigravityResponse.models);
-    }
+    );
 
     // Log quota status for each family
     for (const [family, groupQuota] of Object.entries(quotaResult.groups)) {
@@ -370,6 +444,7 @@ export async function checkAccountsQuota(
 }
 
 export const __testExports = {
+  parseUsageSummary,
   aggregateQuota,
   mapWithConcurrency,
 }

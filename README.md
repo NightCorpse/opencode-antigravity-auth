@@ -170,6 +170,8 @@ npm run link-bin
 
 Argon OAuth requests use the tier-specific Antigravity backend IDs (`gemini-4-argon-low`, `-medium`, `-high`) and CLI 1.4.0 identity. The public Gemini API uses the bare `gemini-4-argon` ID instead.
 
+`opencode-agy quota` displays the official usage-summary groups and every quota window returned for each account, including shared Gemini limits and separate Argon limits when applicable. Windows, balances, and reset times come from the server rather than hardcoded plan rules. If the summary API is unavailable, it falls back to legacy per-model quota inspection.
+
 **Antigravity SDK / Gemini API projects** (API-key backed; used by API-key auth, or as OAuth fallback when configured):
 
 The official Antigravity SDK uses `GEMINI_API_KEY` for local Gemini access. This plugin now supports that path directly for Gemini models while keeping OAuth accounts for Antigravity and Claude.

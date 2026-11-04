@@ -414,7 +414,7 @@ export async function displayAccountsQuota(
       const empty = width - filled;
       const color = getColor(remaining);
       const bar = `${color}${"█".repeat(filled)}${colors.reset}${"░".repeat(empty)}`;
-      const pct = `${color}${Math.round(remaining * 100)}%${colors.reset}`.padStart(
+      const pct = `${color}${(remaining * 100).toFixed(2)}%${colors.reset}`.padStart(
         4 + color.length + colors.reset.length,
       );
       return `${bar} ${pct}`;
@@ -439,13 +439,30 @@ export async function displayAccountsQuota(
 
     // Display Antigravity quota
     const hasAntigravity =
-      res.quota && Object.keys(res.quota.groups).length > 0;
+      res.quota && (res.quota.usageGroups?.length || Object.keys(res.quota.groups).length > 0);
     console.log(`  │`);
     console.log(`  └─ Antigravity Quota`);
     if (!hasAntigravity) {
       const errorMsg =
         res.quota?.error || "No quota information available";
       console.log(`     └─ ${errorMsg}`);
+    } else if (res.quota?.usageGroups) {
+      res.quota.usageGroups.forEach((group, groupIndex, groups) => {
+        const lastGroup = groupIndex === groups.length - 1;
+        const groupName = group.displayName === "Gemini Models" ? "Gemini Flash and Pro" : group.displayName;
+        console.log(`     ${lastGroup ? "└─" : "├─"} ${groupName}`);
+        const windowOrder = (window?: string): number => window === "5h" ? 0 : window === "weekly" ? 1 : 2;
+        const buckets = [...group.buckets].sort((a, b) => windowOrder(a.window) - windowOrder(b.window));
+        buckets.forEach((bucket, bucketIndex) => {
+          const label = bucket.window ? `[${bucket.window}]` : bucket.displayName;
+          const remaining = bucket.disabled ? "Unavailable"
+            : bucket.remainingFraction !== undefined ? createProgressBar(bucket.remainingFraction)
+            : bucket.remainingAmount !== undefined ? `${bucket.remainingAmount} remaining` : "Quota unknown";
+          const prefix = lastGroup ? "   " : "│  ";
+          const connector = bucketIndex === buckets.length - 1 ? "└─" : "├─";
+          console.log(`     ${prefix}${connector} ${label.padEnd(10)} ${remaining}${formatReset(bucket.resetTime)}`);
+        });
+      });
     } else {
       const groups = res.quota!.groups;
       const groupEntries = [
@@ -465,7 +482,7 @@ export async function displayAccountsQuota(
     }
     console.log("");
 
-    if (res.quota?.groups) {
+    if (res.quota && !res.quota.usageGroups && Object.keys(res.quota.groups).length > 0) {
       const acc = storage.accounts[res.index];
       if (acc) {
         acc.cachedQuota = res.quota.groups;
@@ -477,8 +494,8 @@ export async function displayAccountsQuota(
     if (res.updatedAccount) {
       storage.accounts[res.index] = {
         ...res.updatedAccount,
-        cachedQuota: res.quota?.groups,
-        cachedQuotaUpdatedAt: Date.now(),
+        cachedQuota: res.quota?.usageGroups ? storage.accounts[res.index]?.cachedQuota : res.quota?.groups,
+        cachedQuotaUpdatedAt: res.quota?.usageGroups ? storage.accounts[res.index]?.cachedQuotaUpdatedAt : Date.now(),
       };
       storageUpdated = true;
     }
