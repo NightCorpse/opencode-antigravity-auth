@@ -6,6 +6,7 @@
  */
 
 import type { ResolvedModel, ThinkingTier, GoogleSearchConfig } from "./types";
+import { isGemini4ArgonModel } from "./gemini";
 
 /**
  * Thinking tier budgets by model family.
@@ -254,6 +255,22 @@ export function resolveAntigravityGemini38FlashBackendModel(
   return GEMINI_38_FLASH_MODELS[level];
 }
 
+/** The OAuth backend advertises separate Argon IDs; the public API uses the bare ID. */
+export function resolveAntigravityGemini4ArgonBackendModel(
+  model: string,
+  thinkingLevel?: string,
+): string | undefined {
+  if (!isGemini4ArgonModel(model)) return undefined;
+  const tier = model.toLowerCase().match(TIER_REGEX)?.[1];
+  const level = thinkingLevel ?? tier ?? "medium";
+  if (level !== "low" && level !== "medium" && level !== "high") {
+    throw new Error(
+      `Gemini 4 Argon does not support thinking level "${level}"; use low, medium, or high.`,
+    );
+  }
+  return `gemini-4-argon-${level}`;
+}
+
 export function getDefaultGemini3ThinkingLevel(model: string): string {
   const normalized = model.toLowerCase().replace(QUOTA_PREFIX_REGEX, "");
   if (/^gemini-3\.[678]-flash(?:-|$)/.test(normalized)) {
@@ -300,6 +317,24 @@ export function resolveModelWithTier(
   const isImageModel = IMAGE_GENERATION_MODELS.test(modelWithoutQuota);
   const quotaPreference = "antigravity" as const;
   const explicitQuota = isAntigravity || isImageModel;
+
+  if (isGemini4ArgonModel(modelWithoutQuota)) {
+    const argonTier = modelWithoutQuota.toLowerCase().match(TIER_REGEX)?.[1];
+    const thinkingLevel = argonTier ?? "medium";
+    if (thinkingLevel !== "low" && thinkingLevel !== "medium" && thinkingLevel !== "high") {
+      throw new Error(
+        `Gemini 4 Argon does not support thinking level "${thinkingLevel}"; use low, medium, or high.`,
+      );
+    }
+    return {
+      actualModel: `gemini-4-argon-${thinkingLevel}`,
+      thinkingLevel,
+      ...(argonTier ? { tier: thinkingLevel } : {}),
+      isThinkingModel: true,
+      quotaPreference,
+      explicitQuota,
+    };
+  }
 
   const isGemini3 = modelWithoutQuota.toLowerCase().startsWith("gemini-3");
   const skipAlias = isAntigravity && isGemini3;
@@ -569,7 +604,7 @@ export function resolveModelWithVariant(
   const budget = variantConfig.thinkingBudget;
   const isGemini3 = base.actualModel.toLowerCase().includes("gemini-3");
 
-  if (isGemini3) {
+  if (isGemini3 || isGemini4ArgonModel(base.actualModel)) {
     const level = budgetToGemini3Level(budget);
     const isAntigravityGemini3Pro =
       base.quotaPreference === "antigravity" &&
@@ -579,6 +614,8 @@ export function resolveModelWithVariant(
     if (isAntigravityGemini3Pro) {
       const baseModel = base.actualModel.replace(/-(low|medium|high)$/, "");
       actualModel = `${baseModel}-${level}`;
+    } else if (base.quotaPreference === "antigravity" && isGemini4ArgonModel(base.actualModel)) {
+      actualModel = `gemini-4-argon-${level}`;
     }
 
     return {

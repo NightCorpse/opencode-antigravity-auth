@@ -8,7 +8,7 @@ import {
 } from "./request";
 import { DEFAULT_CONFIG } from "./config";
 import { initializeDebug } from "./debug";
-import { SKIP_THOUGHT_SIGNATURE } from "../constants";
+import { ANTIGRAVITY_ARGON_CLI_USER_AGENT, ANTIGRAVITY_CLI_USER_AGENT, SKIP_THOUGHT_SIGNATURE } from "../constants";
 import { cacheSignature, getCachedSignature, clearSignatureCache } from "./cache";
 import * as config from "./config";
 import type { SignatureStore, ThoughtBuffer, StreamingCallbacks, StreamingOptions } from "./core/streaming/types";
@@ -1462,6 +1462,125 @@ describe("request.ts", () => {
           "session-1",
         ),
       ).rejects.toMatchObject({ message: "THINKING_RECOVERY_NEEDED" });
+    });
+  });
+});
+
+describe("Gemini 4 Argon requests", () => {
+  const model = "antigravity-gemini-4-argon";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+
+  it("keeps the previous CLI identity for Gemini 3.8", () => {
+    const result = prepareAntigravityRequest(
+      url.replace(model, "antigravity-gemini-3.8-flash"),
+      { method: "POST", body: JSON.stringify({ contents: [] }) },
+      "token",
+      "project",
+    );
+    expect(new Headers(result.init.headers).get("User-Agent")).toBe(ANTIGRAVITY_CLI_USER_AGENT);
+    expect(result.effectiveModel).toBe("gemini-3.8-flash-medium");
+  });
+
+  describe.each([false, true])("wrapped=%s", (wrapped) => {
+    it.each([
+      { config: {}, level: "medium" },
+      { config: { providerOptions: { google: { thinkingLevel: "high" } } }, level: "high" },
+      { config: { generationConfig: { thinkingConfig: { thinkingLevel: "low" } } }, level: "low" },
+      { config: { providerOptions: { google: { thinkingConfig: { thinkingBudget: 32768 } } } }, level: "high" },
+      { config: { generationConfig: { thinkingConfig: { thinkingBudget: 32768 } } }, level: "high" },
+    ])("uses the $level backend id with the current CLI identity", ({ config, level }) => {
+      const payload = { contents: [], ...config };
+      const result = prepareAntigravityRequest(url, {
+        method: "POST",
+        body: JSON.stringify(wrapped ? { project: "project", request: payload } : payload),
+      }, "token", "project");
+      const body = JSON.parse(result.init.body as string);
+      expect(result.effectiveModel).toBe(`gemini-4-argon-${level}`);
+      expect(body.model).toBe(`gemini-4-argon-${level}`);
+      expect(new Headers(result.init.headers).get("User-Agent")).toBe(ANTIGRAVITY_ARGON_CLI_USER_AGENT);
+      expect(body.request.generationConfig.thinkingConfig.thinkingLevel).toBe(level);
+      expect(body.request.generationConfig.thinkingConfig).not.toHaveProperty("thinkingBudget");
+    });
+
+    it("removes deprecated sampling parameters and preserves the output limit", () => {
+      const payload = {
+        contents: [],
+        generationConfig: {
+          temperature: 0.5,
+          topP: 0.8,
+          topK: 20,
+          candidateCount: 2,
+          maxOutputTokens: 65536,
+        },
+      };
+      const result = prepareAntigravityRequest(url, {
+        method: "POST",
+        body: JSON.stringify(wrapped ? { project: "project", request: payload } : payload),
+      }, "token", "project");
+      expect(JSON.parse(result.init.body as string).request.generationConfig).toEqual({
+        maxOutputTokens: 65536,
+        thinkingConfig: { thinkingLevel: "medium", includeThoughts: true },
+      });
+    });
+
+    it.each(["minimal", "unknown"])("rejects the unsupported %s thinking level", (level) => {
+      const payload = {
+        contents: [],
+        generationConfig: { thinkingConfig: { thinkingLevel: level } },
+      };
+      expect(() => prepareAntigravityRequest(url, {
+        method: "POST",
+        body: JSON.stringify(wrapped ? { project: "project", request: payload } : payload),
+      }, "token", "project")).toThrow(`Gemini 4 Argon does not support thinking level "${level}"`);
+    });
+
+    it("replays streamed thought signatures on a tool continuation across projects", async () => {
+      const contents = [{ role: "user", parts: [{ text: `Argon signature test wrapped=${wrapped}` }] }];
+      const first = prepareAntigravityRequest(url, {
+        method: "POST",
+        body: JSON.stringify(wrapped ? { project: "project-A", request: { contents } } : { contents }),
+      }, "token", "project-A");
+      const sessionKey = first.sessionId;
+      if (!sessionKey) throw new Error("Missing signature session key");
+      clearSignatureCache(sessionKey);
+      const thoughtText = "I should search the workspace.";
+      const signature = "a".repeat(MIN_SIGNATURE_LENGTH + 12);
+      const functionCall = { name: "grep", args: { pattern: "Argon" } };
+
+      try {
+        const response = await transformAntigravityResponse(new Response(
+          `data: ${JSON.stringify({ response: { candidates: [{ content: {
+            role: "model",
+            parts: [{ thought: true, text: thoughtText }, { functionCall, thoughtSignature: signature }],
+          } }] } })}\n\n`,
+          { headers: { "Content-Type": "text/event-stream" } },
+        ), true, undefined, model, "project-A", undefined, first.effectiveModel, sessionKey);
+        await response.text();
+        expect(getCachedSignature(sessionKey, thoughtText)).toBe(signature);
+
+        const continuation = {
+          providerOptions: { google: { thinkingLevel: "high" } },
+          contents: [
+            ...contents,
+            { role: "model", parts: [{ thought: true, text: thoughtText }, { functionCall }] },
+            { role: "user", parts: [{ functionResponse: { name: "grep", response: { result: "found" } } }] },
+          ],
+        };
+        const next = prepareAntigravityRequest(url, {
+          method: "POST",
+          body: JSON.stringify(wrapped ? { project: "project-B", request: continuation } : continuation),
+        }, "token", "project-B");
+        expect(next.sessionId).toBe(sessionKey);
+        expect(next.effectiveModel).toBe("gemini-4-argon-high");
+        const body = JSON.parse(next.init.body as string);
+        expect(body.request.contents[1].parts.find((part: Record<string, unknown>) => part.functionCall)).toMatchObject({
+          functionCall,
+          thoughtSignature: signature,
+        });
+        expect(body.request.contents[2].parts[0].functionResponse.name).toBe("grep");
+      } finally {
+        clearSignatureCache(sessionKey);
+      }
     });
   });
 });

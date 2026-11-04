@@ -164,8 +164,11 @@ npm run link-bin
 | `antigravity-gemini-3.6-flash` | low, medium, high | Gemini 3.6 Flash with thinking (medium default) |
 | `antigravity-gemini-3.7-flash` | minimal, low, medium, high | Gemini 3.7 Flash with thinking |
 | `antigravity-gemini-3.8-flash` | low, medium, high | Gemini 3.8 Flash with thinking (medium default) |
+| `antigravity-gemini-4-argon` | low, medium, high | Gemini 4 Argon with thinking (medium default; account-dependent availability) |
 | `antigravity-claude-sonnet-4-6` | — | Claude Sonnet 4.6 |
 | `antigravity-claude-opus-4-6-thinking` | low, max | Claude Opus 4.6 with extended thinking |
+
+Argon OAuth requests use the tier-specific Antigravity backend IDs (`gemini-4-argon-low`, `-medium`, `-high`) and CLI 1.4.0 identity. The public Gemini API uses the bare `gemini-4-argon` ID instead.
 
 **Antigravity SDK / Gemini API projects** (API-key backed; used by API-key auth, or as OAuth fallback when configured):
 

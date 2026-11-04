@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   isGeminiModel,
   isGemini3Model,
+  isGemini4ArgonModel,
   isGemini25Model,
   isImageGenerationModel,
   buildGemini3ThinkingConfig,
@@ -70,6 +71,8 @@ describe("transform/gemini", () => {
       "gemini-3.8-flash",
       "antigravity-gemini-3.8-flash-high",
       "gemini-3.5-flash-lite",
+      "gemini-4-argon",
+      "antigravity-gemini-4-argon-high",
     ])("removes deprecated sampling fields for %s", (model) => {
       const payload: RequestPayload = {
         generationConfig: {
@@ -107,6 +110,16 @@ describe("transform/gemini", () => {
         temperature: 0.7,
         topP: 0.9,
       });
+    });
+  });
+
+  describe("isGemini4ArgonModel", () => {
+    it.each(["gemini-4-argon", "antigravity-gemini-4-argon-high", "GEMINI-4-ARGON"])("recognizes %s", (model) => {
+      expect(isGemini4ArgonModel(model)).toBe(true);
+    });
+
+    it.each(["gemini-4-other", "gemini-4-argon-image", "claude-gemini-4-argon"])("does not match %s", (model) => {
+      expect(isGemini4ArgonModel(model)).toBe(false);
     });
   });
 

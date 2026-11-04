@@ -247,6 +247,11 @@ export function isGemini3Model(model: string): boolean {
   return model.toLowerCase().includes("gemini-3");
 }
 
+/** Includes tier suffixes so unsupported `minimal` can be rejected by the caller. */
+export function isGemini4ArgonModel(model: string): boolean {
+  return /^(?:antigravity-)?gemini-4-argon(?:-(?:minimal|low|medium|high))?$/i.test(model);
+}
+
 const STRICT_SAMPLING_MODEL_REGEX =
   /^gemini-(?:3\.[678]-flash(?:-(?:low|medium|high|tiered))?|3\.5-flash-lite)$/i;
 const DEPRECATED_SAMPLING_FIELDS = [
@@ -268,7 +273,7 @@ export function sanitizeGeminiGenerationConfigForModel(
   model: string,
 ): void {
   const normalizedModel = model.replace(/^antigravity-/i, "");
-  if (!STRICT_SAMPLING_MODEL_REGEX.test(normalizedModel)) {
+  if (!STRICT_SAMPLING_MODEL_REGEX.test(normalizedModel) && !isGemini4ArgonModel(normalizedModel)) {
     return;
   }
 
@@ -558,8 +563,8 @@ export function applyGeminiTransforms(
   if (normalizedThinking) {
     let thinkingConfig: ThinkingConfig;
 
-    if (tierThinkingLevel && isGemini3Model(model)) {
-      // Gemini 3 uses thinkingLevel string
+    if (tierThinkingLevel && (isGemini3Model(model) || isGemini4ArgonModel(model))) {
+      // Gemini 3 and Argon use thinkingLevel strings
       thinkingConfig = buildGemini3ThinkingConfig(
         normalizedThinking.includeThoughts ?? true,
         tierThinkingLevel,

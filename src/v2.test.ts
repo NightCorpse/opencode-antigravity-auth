@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 import type { Plugin } from "@opencode/plugin"
+import { OPENCODE_MODEL_DEFINITIONS } from "./plugin/config/models"
 
 const state = vi.hoisted(() => ({
   fetch: vi.fn(async () => new Response("ok")),
@@ -43,6 +44,7 @@ vi.mock("./plugin", () => ({
     },
     provider: {
       models: async () => ({
+        "antigravity-gemini-4-argon": OPENCODE_MODEL_DEFINITIONS["antigravity-gemini-4-argon"],
         "antigravity-gemini-3-pro": {
           name: "Gemini 3 Pro (Antigravity)",
         },
@@ -216,6 +218,14 @@ describe("OpenCodeV2Plugin", () => {
       expect.objectContaining({ id: "antigravity-gemini-3-pro" }),
       expect.objectContaining({ id: "antigravity-gemini-3.8-flash-tiered" }),
     ]))
+    expect(providerModels.find((model) => model.id === "antigravity-gemini-4-argon")).toMatchObject({
+      name: "Gemini 4 Argon (Antigravity)",
+      variants: ["low", "medium", "high"].map((level) => ({
+        id: level,
+        settings: { thinkingLevel: level },
+        body: { generationConfig: { thinkingConfig: { thinkingLevel: level } } },
+      })),
+    })
     expect(removedModels).toEqual([
       "antigravity-gemini-3-pro",
       "antigravity-gemini-3.5-flash-low",

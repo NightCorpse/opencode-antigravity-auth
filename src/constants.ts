@@ -58,6 +58,10 @@ const ANTIGRAVITY_CLI_ARCH = process.arch === "x64" ? "amd64" : process.arch;
 export const ANTIGRAVITY_CLI_USER_AGENT =
   `antigravity/cli/1.1.24 (aidev_client; os_type=${ANTIGRAVITY_CLI_OS}; arch=${ANTIGRAVITY_CLI_ARCH}; cl=974782877; auth_method=consumer)`;
 
+// Argon backend IDs are advertised only to newer CLI versions (verified with agy 1.4.0).
+export const ANTIGRAVITY_ARGON_CLI_USER_AGENT =
+  `antigravity/cli/1.4.0 (aidev_client; os_type=${ANTIGRAVITY_CLI_OS}; arch=${ANTIGRAVITY_CLI_ARCH}; auth_method=consumer)`;
+
 export const ANTIGRAVITY_VERSION_FALLBACK = "1.18.3";
 let antigravityVersion = ANTIGRAVITY_VERSION_FALLBACK;
 let versionLocked = false;

@@ -6,6 +6,54 @@ import {
 } from "./model-resolver";
 
 describe("resolveModelWithTier", () => {
+  describe("Gemini 4 Argon", () => {
+    it.each([
+      ["gemini-4-argon", "medium"],
+      ["antigravity-gemini-4-argon", "medium"],
+      ["antigravity-gemini-4-argon-low", "low"],
+      ["antigravity-gemini-4-argon-medium", "medium"],
+      ["antigravity-gemini-4-argon-high", "high"],
+      ["ANTIGRAVITY-GEMINI-4-ARGON-HIGH", "high"],
+    ])("resolves %s using the tier-specific backend id and %s thinking", (model, level) => {
+      expect(resolveModelWithTier(model)).toMatchObject({
+        actualModel: `gemini-4-argon-${level}`,
+        thinkingLevel: level,
+        isThinkingModel: true,
+        quotaPreference: "antigravity",
+      });
+      expect(resolveModelWithTier(model).thinkingBudget).toBeUndefined();
+    });
+
+    it.each(["antigravity", "agy-sdk"] as const)("preserves Argon levels on the %s route", (style) => {
+      expect(resolveModelForHeaderStyle("antigravity-gemini-4-argon-high", style)).toMatchObject({
+        actualModel: style === "antigravity" ? "gemini-4-argon-high" : "gemini-4-argon",
+        thinkingLevel: "high",
+        quotaPreference: style,
+      });
+    });
+
+    it("converts legacy budget variants to levels", () => {
+      expect(resolveModelWithVariant("antigravity-gemini-4-argon", { thinkingBudget: 32768 })).toMatchObject({
+        actualModel: "gemini-4-argon-high",
+        thinkingLevel: "high",
+        thinkingBudget: undefined,
+      });
+    });
+
+    it("rejects the unsupported minimal tier", () => {
+      expect(() => resolveModelWithTier("antigravity-gemini-4-argon-minimal")).toThrow(
+        'Gemini 4 Argon does not support thinking level "minimal"',
+      );
+    });
+
+    it("does not assume support for other Gemini 4 models", () => {
+      expect(resolveModelWithTier("gemini-4-other-high")).toMatchObject({
+        actualModel: "gemini-4-other-high",
+        isThinkingModel: false,
+      });
+    });
+  });
+
   describe("Gemini 3 flash models (Issue #109)", () => {
     it("antigravity-gemini-3-flash gets default thinkingLevel 'low'", () => {
       const result = resolveModelWithTier("antigravity-gemini-3-flash");

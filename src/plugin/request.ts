@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import {
   ANTIGRAVITY_ENDPOINT,
   ANTIGRAVITY_CLI_USER_AGENT,
+  ANTIGRAVITY_ARGON_CLI_USER_AGENT,
   EMPTY_SCHEMA_PLACEHOLDER_NAME,
   EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION,
   SKIP_THOUGHT_SIGNATURE,
@@ -58,6 +59,8 @@ import {
   needsThinkingRecovery,
 } from "./thinking-recovery";
 import { sanitizeCrossModelPayloadInPlace } from "./transform/cross-model-sanitizer";
+import { isGemini4ArgonModel } from "./transform/gemini";
+import { resolveAntigravityGemini4ArgonBackendModel } from "./transform/model-resolver";
 import {
   isGemini3Model,
   isImageGenerationModel,
@@ -137,9 +140,9 @@ function buildSignatureSessionKey(
 function shouldCacheThinkingSignatures(model?: string): boolean {
   if (typeof model !== "string") return false;
   const lower = model.toLowerCase();
-  // Both Claude and Gemini 3 models require thought signature caching
+  // Claude, Gemini 3 and Argon require thought signature caching
   // for multi-turn conversations with function calling
-  return lower.includes("claude") || lower.includes("gemini-3");
+  return lower.includes("claude") || isGemini3Model(model) || isGemini4ArgonModel(model);
 }
 
 /**
@@ -151,13 +154,14 @@ function shouldCacheThinkingSignatures(model?: string): boolean {
  * reasoning continuity across quota-driven account/project switches: otherwise
  * the key changes on a switch, the cache misses, the validation-bypass sentinel
  * is sent instead of the real signature, and the model loses its chain-of-thought
- * and re-plans the same step forever. Claude keeps project partitioning.
+ * and re-plans the same step forever. Argon uses the same Gemini cache
+ * partitioning; Claude keeps project partitioning.
  */
 function signatureCacheProjectKey(
   model: string | undefined,
   projectKey: string | undefined,
 ): string | undefined {
-  if (typeof model === "string" && model.toLowerCase().includes("gemini-3")) {
+  if (typeof model === "string" && (isGemini3Model(model) || isGemini4ArgonModel(model))) {
     return undefined;
   }
   return projectKey;
@@ -1009,13 +1013,13 @@ function generateSyntheticProjectId(): string {
   return `${adj}-${noun}-${randomPart}`;
 }
 
-function ensureDefaultGemini3ThinkingLevel(
+function ensureDefaultGeminiThinkingLevel(
   requestPayload: Record<string, unknown>,
   effectiveModel: string,
   thinkingLevel?: string,
 ): void {
   if (
-    !effectiveModel.toLowerCase().includes("gemini-3") ||
+    (!isGemini3Model(effectiveModel) && !isGemini4ArgonModel(effectiveModel)) ||
     isImageGenerationModel(effectiveModel)
   ) {
     return;
@@ -1033,8 +1037,21 @@ function ensureDefaultGemini3ThinkingLevel(
       : {};
 
   if (typeof thinkingConfig.thinkingLevel !== "string") {
-    thinkingConfig.thinkingLevel =
-      thinkingLevel ?? getDefaultGemini3ThinkingLevel(effectiveModel);
+    thinkingConfig.thinkingLevel = thinkingLevel ?? (
+      isGemini4ArgonModel(effectiveModel) ? "medium" : getDefaultGemini3ThinkingLevel(effectiveModel)
+    );
+  }
+  if (
+    isGemini4ArgonModel(effectiveModel) &&
+    !["low", "medium", "high"].includes(String(thinkingConfig.thinkingLevel))
+  ) {
+    throw new Error(
+      `Gemini 4 Argon does not support thinking level "${thinkingConfig.thinkingLevel}"; use low, medium, or high.`,
+    );
+  }
+  if (isGemini4ArgonModel(effectiveModel)) {
+    delete thinkingConfig.thinkingBudget;
+    delete thinkingConfig.thinking_budget;
   }
   if (typeof thinkingConfig.includeThoughts !== "boolean") {
     thinkingConfig.includeThoughts = true;
@@ -1313,7 +1330,7 @@ export function prepareAntigravityRequest(
           }
         }
 
-        if (effectiveModel.toLowerCase().includes("gemini-3")) {
+        if (isGemini3Model(effectiveModel) || isGemini4ArgonModel(effectiveModel)) {
           for (const req of requestObjects) {
             const variantConfig = extractVariantThinkingConfig(
               (req as any).providerOptions as
@@ -1342,6 +1359,11 @@ export function prepareAntigravityRequest(
         }
 
         if (headerStyle === "antigravity") {
+          const argonBackendModel = resolveAntigravityGemini4ArgonBackendModel(effectiveModel, tierThinkingLevel);
+          if (argonBackendModel) {
+            effectiveModel = argonBackendModel;
+            wrappedBody.model = argonBackendModel;
+          }
           const gemini38FlashBackendModel =
             resolveAntigravityGemini38FlashBackendModel(
               effectiveModel,
@@ -1399,11 +1421,18 @@ export function prepareAntigravityRequest(
             req as Record<string, unknown>,
             effectiveModel,
           );
-          ensureDefaultGemini3ThinkingLevel(
+          ensureDefaultGeminiThinkingLevel(
             req as Record<string, unknown>,
             effectiveModel,
             tierThinkingLevel,
           );
+
+          if (isGemini4ArgonModel(effectiveModel)) {
+            sanitizeRequestPayloadForAntigravity(req, {
+              sessionKey: signatureSessionKey,
+              getSignature: getCachedSignature,
+            });
+          }
 
           if (isClaude) {
             // Steps 0-2: cross-model strip, thinking-block filtering, cache_control,
@@ -1463,18 +1492,18 @@ export function prepareAntigravityRequest(
           requestPayload.providerOptions as Record<string, unknown> | undefined,
           rawGenerationConfig,
         );
-        const isGemini3 = effectiveModel.toLowerCase().includes("gemini-3");
+        const usesThinkingLevel = isGemini3Model(effectiveModel) || isGemini4ArgonModel(effectiveModel);
 
         log.debug(
           `[ThinkingResolution] rawModel=${rawModel} resolvedModel=${effectiveModel} resolvedTier=${tierThinkingLevel ?? "none"} variantLevel=${variantConfig?.thinkingLevel ?? "none"} variantBudget=${variantConfig?.thinkingBudget ?? "none"} providerOptions.google=${JSON.stringify((requestPayload.providerOptions as any)?.google ?? null)} generationConfig.thinkingConfig=${JSON.stringify((rawGenerationConfig as any)?.thinkingConfig ?? null)}`,
         );
 
-        if (variantConfig?.thinkingLevel && isGemini3) {
-          // Gemini 3 native format - use thinkingLevel directly
+        if (variantConfig?.thinkingLevel && usesThinkingLevel) {
+          // Gemini 3 / Argon native format - use thinkingLevel directly
           tierThinkingLevel = variantConfig.thinkingLevel;
           tierThinkingBudget = undefined;
         } else if (variantConfig?.thinkingBudget) {
-          if (isGemini3) {
+          if (usesThinkingLevel) {
             // Legacy format for Gemini 3 - convert with deprecation warning
             log.warn(
               "[Deprecated] Using thinkingBudget for Gemini 3 model. Use thinkingLevel instead.",
@@ -1494,6 +1523,7 @@ export function prepareAntigravityRequest(
         }
 
         if (headerStyle === "antigravity") {
+          effectiveModel = resolveAntigravityGemini4ArgonBackendModel(effectiveModel, tierThinkingLevel) ?? effectiveModel;
           const gemini38FlashBackendModel =
             resolveAntigravityGemini38FlashBackendModel(
               effectiveModel,
@@ -1998,7 +2028,7 @@ export function prepareAntigravityRequest(
         const conversationKey = resolveConversationKey(requestPayload);
         signatureSessionKey = buildSignatureSessionKey(
           PLUGIN_SESSION_ID,
-          effectiveModel,
+          isGemini4ArgonModel(effectiveModel) ? "gemini-4-argon" : effectiveModel,
           conversationKey,
           signatureCacheProjectKey(
             effectiveModel,
@@ -2171,6 +2201,9 @@ export function prepareAntigravityRequest(
         }
 
         stripInjectedDebugFromRequestPayload(requestPayload);
+        if (isGemini4ArgonModel(effectiveModel)) {
+          ensureDefaultGeminiThinkingLevel(requestPayload, effectiveModel, tierThinkingLevel);
+        }
         // Gemini 3 caches thought signatures on the response side but, unlike
         // Claude, had no request-side path to replay them — so restore the
         // cached signature here. Without it the model loses reasoning
@@ -2296,7 +2329,9 @@ export function prepareAntigravityRequest(
 
     headers.set(
       "User-Agent",
-      /^gemini-3\.8-flash-(?:low|medium|high)$/i.test(effectiveModel)
+      isGemini4ArgonModel(effectiveModel)
+        ? ANTIGRAVITY_ARGON_CLI_USER_AGENT
+        : /^gemini-3\.8-flash-(?:low|medium|high)$/i.test(effectiveModel)
         ? ANTIGRAVITY_CLI_USER_AGENT
         : fingerprintHeaders["User-Agent"] || selectedHeaders["User-Agent"],
     );
@@ -2452,7 +2487,7 @@ export async function transformAntigravityResponse(
         debugText,
         cacheSignatures,
         displayedThinkingHashes:
-          effectiveModel && isGemini3Model(effectiveModel)
+          effectiveModel && (isGemini3Model(effectiveModel) || isGemini4ArgonModel(effectiveModel))
             ? getDisplayedThinkingHashes(sessionId)
             : undefined,
         // injectSyntheticThinking removed - keep_thinking now unified with debug via debugText

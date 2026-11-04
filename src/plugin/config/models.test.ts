@@ -28,6 +28,7 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
       "antigravity-gemini-3.6-flash",
       "antigravity-gemini-3.7-flash",
       "antigravity-gemini-3.8-flash",
+      "antigravity-gemini-4-argon",
     ]);
   });
 
@@ -77,6 +78,20 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
   });
 
 
+  it("defines Argon with only its supported thinking levels", () => {
+    expect(getModel("antigravity-gemini-4-argon")).toMatchObject({
+      name: "Gemini 4 Argon (Antigravity)",
+      temperature: false,
+      limit: { context: 1048576, output: 65536 },
+      variants: {
+        low: { thinkingLevel: "low" },
+        medium: { thinkingLevel: "medium" },
+        high: { thinkingLevel: "high" },
+      },
+    });
+    expect(getModel("antigravity-gemini-4-argon").variants).not.toHaveProperty("minimal");
+  });
+
   it("defines thinking budget variants for Claude thinking models", () => {
     expect(getModel("antigravity-claude-opus-4-6-thinking").variants).toEqual({
       low: { thinkingConfig: { thinkingBudget: 8192 } },
@@ -86,6 +101,13 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
 });
 
 describe("dynamic model discovery helpers", () => {
+  it("preserves Argon capabilities and variants during Antigravity discovery", () => {
+    const models = modelsFromAntigravityAvailableModels({
+      "gemini-4-argon": { displayName: "Gemini 4 Argon", modelName: "gemini-4-argon" },
+    });
+    expect(models["antigravity-gemini-4-argon"]).toEqual(getModel("antigravity-gemini-4-argon"));
+  });
+
   it("converts Gemini models.list metadata into OpenCode models", () => {
     const models = modelsFromGeminiApi([
       {

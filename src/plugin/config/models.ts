@@ -128,6 +128,17 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
       high: { thinkingLevel: "high" },
     },
   },
+  "antigravity-gemini-4-argon": {
+    name: "Gemini 4 Argon (Antigravity)",
+    temperature: false,
+    limit: { context: 1048576, output: 65536 },
+    modalities: DEFAULT_MODALITIES,
+    variants: {
+      low: { thinkingLevel: "low" },
+      medium: { thinkingLevel: "medium" },
+      high: { thinkingLevel: "high" },
+    },
+  },
   "antigravity-claude-sonnet-4-6": {
     name: "Claude Sonnet 4.6 (Antigravity)",
     limit: { context: 200000, output: 64000 },

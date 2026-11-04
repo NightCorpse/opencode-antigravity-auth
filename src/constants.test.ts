@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
   ANTIGRAVITY_CLI_USER_AGENT,
+  ANTIGRAVITY_ARGON_CLI_USER_AGENT,
   ANTIGRAVITY_ENDPOINT_DAILY,
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   getRandomizedHeaders,
@@ -8,6 +9,10 @@ import {
 } from "./constants.ts"
 
 describe("Antigravity CLI identity", () => {
+  it("uses the newer CLI identity for Argon entitlement", () => {
+    expect(ANTIGRAVITY_ARGON_CLI_USER_AGENT).toMatch(/^antigravity\/cli\/1\.4\.0 /)
+    expect(ANTIGRAVITY_ARGON_CLI_USER_AGENT).toContain("auth_method=consumer")
+  })
   it("includes the CLI product and consumer auth method", () => {
     expect(ANTIGRAVITY_CLI_USER_AGENT).toMatch(/^antigravity\/cli\/1\.1\.24 /)
     expect(ANTIGRAVITY_CLI_USER_AGENT).toContain("auth_method=consumer")
