@@ -8,6 +8,8 @@
 
 ### Changed
 
+- Account-manager administrative changes and model configuration now await `opencode reload` instead of restarting the shared service. Failed reloads report a manual-reload warning without undoing saved changes.
+
 - Configure models and V2 discovery now use a focused catalog of Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus/Sonnet 5.5 and 4.6, and GPT-OSS 120B, independent of account plans. Other entries are removed from generated configuration; legacy request resolvers remain available for existing sessions.
 
 - Account selection and rotation consult fresh per-account catalogs, including the lowered backend tier. Missing/disabled models are excluded only for accounts with successful fresh discovery; unknown discovery remains retryable. Model visibility is not restricted by account entitlements.

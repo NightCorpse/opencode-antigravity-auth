@@ -33,6 +33,7 @@ import { AntigravityTokenRefreshError, refreshAccessToken } from "./token";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { exec } from "node:child_process";
+import { reloadOpencodeConfiguration } from "./reload";
 import type { PluginClient } from "./types";
 
 const MAX_OAUTH_ACCOUNTS = 10;
@@ -510,14 +511,6 @@ export async function displayAccountsQuota(
 /**
  * Runs the interactive Antigravity account manager in the terminal.
  */
-export function restartOpencodeServiceSafely(): void {
-  try {
-    exec("opencode service restart", () => {});
-  } catch {
-    // Non-critical background sync
-  }
-}
-
 export async function runInteractiveAccountManager(
   args: string[] = process.argv.slice(2),
   client: PluginClient = createDummyClient(),
@@ -603,7 +596,7 @@ export async function runInteractiveAccountManager(
             acc.enabled = acc.enabled === false;
             acc.enabledUpdatedAt = Date.now();
             await saveAccounts(existingStorage);
-            restartOpencodeServiceSafely();
+            await reloadOpencodeConfiguration();
             console.log(
               `\nAccount ${acc.email || menuResult.toggleAccountIndex + 1} ${acc.enabled ? "enabled" : "disabled"}.\n`,
             );
@@ -804,7 +797,7 @@ export async function runInteractiveAccountManager(
           existingStorage.accounts[menuResult.deleteAccountIndex];
         if (deletedAccount) {
           await removeAccountFromStorage(deletedAccount.refreshToken);
-          restartOpencodeServiceSafely();
+          await reloadOpencodeConfiguration();
         }
         console.log("\nAccount deleted.\n");
         await pressEnterToContinue();
@@ -813,7 +806,7 @@ export async function runInteractiveAccountManager(
 
       if (menuResult.deleteAll) {
         await clearAccounts();
-        restartOpencodeServiceSafely();
+        await reloadOpencodeConfiguration();
         console.log("\nAll accounts deleted.\n");
         await pressEnterToContinue();
         continue;
@@ -927,7 +920,7 @@ export async function runInteractiveAccountManager(
               activeIndex: currentStorage.activeIndex,
               activeIndexByFamily: currentStorage.activeIndexByFamily,
             });
-            restartOpencodeServiceSafely();
+            await reloadOpencodeConfiguration();
           }
         }
 
@@ -1028,7 +1021,7 @@ export async function runInteractiveAccountManager(
         addedCount++;
         const isFirst = addedCount === 1;
         await persistAccountPoolHelper([result], isFirst && startFresh);
-        restartOpencodeServiceSafely();
+        await reloadOpencodeConfiguration();
 
         console.log(
           `\n✓ Account authenticated${result.email ? ` (${result.email})` : ""}`,
@@ -1124,7 +1117,7 @@ export async function runInteractiveAccountManager(
     }
 
     await persistAccountPoolHelper([result], true);
-    restartOpencodeServiceSafely();
+    await reloadOpencodeConfiguration();
 
     console.log(
       `\n✓ Account authenticated${result.email ? ` (${result.email})` : ""}\n`,
